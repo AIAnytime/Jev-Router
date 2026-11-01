@@ -1,0 +1,26 @@
+# Agents available to POST /v1/route/agent. Requests can also pass their own `agents` list.
+agents:
+  - name: research
+    description: Researches topics on the web, gathers sources and writes cited reports.
+    capabilities: [web search, browsing, source synthesis, fact finding, reports]
+    tools: [web_search, browser]
+  - name: coding
+    description: Writes, reviews, debugs and refactors code; builds apps, APIs and scripts.
+    capabilities: [software engineering, debugging, code review, tests, devops]
+    tools: [code_interpreter, repo, terminal]
+  - name: data_analyst
+    description: Analyzes datasets, runs SQL, builds charts and explains metrics.
+    capabilities: [sql, data analysis, statistics, charts, dashboards]
+    tools: [sql, code_interpreter]
+  - name: sales
+    description: Handles leads, prospecting, outreach emails, CRM updates and deal follow-ups.
+    capabilities: [lead qualification, outreach, crm, pricing questions, follow-ups]
+    tools: [crm, email]
+  - name: support
+    description: Answers customer questions, troubleshoots accounts and handles billing issues.
+    capabilities: [customer support, troubleshooting, billing, refunds, account help]
+    tools: [helpdesk, billing]
+    requires_approval: true
+  - name: writer
+    description: Drafts and edits marketing copy, blog posts, documentation and social content.
+    capabilities: [copywriting, editing, blogs, documentation, social media]

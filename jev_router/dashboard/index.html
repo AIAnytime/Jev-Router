@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev Router</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0a0a'/%3E%3Ctext x='16' y='22.5' font-family='system-ui,sans-serif' font-size='18' font-weight='700' fill='white' text-anchor='middle'%3EJ%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #fafafa; --card: #fff; --ink: #0a0a0a; --muted: #666; --faint: #8f8f8f;
+    --line: #eaeaea; --line-2: #f2f2f2; --accent: #0070f3; --accent-soft: #e8f2ff;
+    --ok: #0a8a4a; --ok-soft: #e6f6ee; --warn: #b26b00; --warn-soft: #fff4e0;
+    --bad: #d93036; --bad-soft: #fdecec;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color: var(--ink); background: var(--bg); letter-spacing: -0.01em;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5; background: rgba(255,255,255,.9);
+    backdrop-filter: saturate(180%) blur(8px); border-bottom: 1px solid var(--line);
+  }
+  .bar { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 56px; display: flex; align-items: center; gap: 24px; }
+  .brand { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .logo { width: 20px; height: 20px; border-radius: 5px; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  nav { display: flex; gap: 4px; }
+  nav button { border: 0; background: none; padding: 6px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; font: inherit; }
+  nav button:hover { color: var(--ink); background: var(--line-2); }
+  nav button.active { color: var(--ink); font-weight: 500; background: var(--line-2); }
+  .spacer { flex: 1; }
+  .status { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+  .dot.ok { background: #0bba5b; } .dot.bad { background: var(--bad); }
+  main { max-width: 1200px; margin: 0 auto; padding: 28px 24px 64px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .between { justify-content: space-between; }
+  .grid { display: grid; gap: 16px; }
+  .g6 { grid-template-columns: repeat(6, 1fr); }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .play { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; }
+  @media (max-width: 960px) { .g6 { grid-template-columns: repeat(3, 1fr); } .g2, .g3, .play { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) { .g6 { grid-template-columns: repeat(2, 1fr); } nav button { padding: 6px 6px; } .status span { display: none; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  .stat .label { color: var(--muted); font-size: 12px; }
+  .stat .value { font-size: 22px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em; }
+  .stat .hint { color: var(--faint); font-size: 12px; margin-top: 2px; }
+  .mt { margin-top: 16px; } .mt-s { margin-top: 8px; }
+  .muted { color: var(--muted); } .faint { color: var(--faint); }
+  .mono { font-family: var(--mono); font-size: 12.5px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  textarea, input, select {
+    width: 100%; font: inherit; color: var(--ink); background: #fff; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; outline: none;
+  }
+  textarea { resize: vertical; min-height: 140px; }
+  textarea:focus, input:focus, select:focus { border-color: #b3b3b3; box-shadow: 0 0 0 3px rgba(0,0,0,.05); }
+  .btn { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 7px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 500; white-space: nowrap; }
+  .btn:hover { border-color: #c8c8c8; }
+  .btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .btn.primary:hover { background: #333; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.sm { padding: 3px 8px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+  tr.click { cursor: pointer; } tr.click:hover td { background: #fafafa; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 12px; background: var(--line-2); color: #444; white-space: nowrap; }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.bad { background: var(--bad-soft); color: var(--bad); }
+  .badge.blue { background: var(--accent-soft); color: var(--accent); }
+  .meter { display: grid; grid-template-columns: minmax(90px, 180px) 1fr 52px; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; }
+  .meter .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track { height: 8px; background: var(--line-2); border-radius: 4px; overflow: hidden; }
+  .fill { height: 100%; background: var(--ink); border-radius: 4px; }
+  .fill.accent { background: var(--accent); }
+  .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 13px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .reason { background: var(--accent-soft); color: #0b4fa8; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .answer { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; max-height: 420px; overflow: auto; }
+  .reasoning { white-space: pre-wrap; color: var(--muted); font-size: 13px; max-height: 200px; overflow: auto; border-left: 2px solid var(--line); padding-left: 10px; }
+  pre.json { font-family: var(--mono); font-size: 12px; background: #fafafa; border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 480px; margin: 0; }
+  .empty { color: var(--faint); text-align: center; padding: 32px 0; }
+  .error { background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 10px 12px; font-size: 13px; overflow-wrap: anywhere; }
+  .chart { width: 100%; height: 160px; display: block; }
+  .tabs-s { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: #fff; }
+  .tabs-s button { border: 0; background: none; font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); }
+  .tabs-s button.active { background: var(--line-2); color: var(--ink); font-weight: 500; }
+  .drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,.2); z-index: 10; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(720px, 100%); background: #fff; border-left: 1px solid var(--line); z-index: 11; overflow-y: auto; padding: 20px 24px; }
+  .hidden { display: none !important; }
+  .comp { display: flex; flex-wrap: wrap; gap: 4px; }
+  .comp span { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--line-2); border-radius: 4px; padding: 0 5px; }
+  .key-row { display: flex; gap: 8px; align-items: center; }
+  .key-row input { width: 220px; padding: 5px 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand"><div class="logo">J</div>Jev Router</div>
+    <nav id="nav">
+      <button data-view="overview" class="active">Overview</button>
+      <button data-view="playground">Playground</button>
+      <button data-view="traces">Traces</button>
+      <button data-view="models">Models</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="key-row hidden" id="keyRow">
+      <input id="keyInput" type="password" placeholder="Router API key" autocomplete="off">
+      <button class="btn sm" id="keySave">Save</button>
+    </div>
+    <div class="status" id="status"><div class="dot"></div><span>Connecting</span></div>
+  </div>
+</header>
+
+<main>
+  <section id="view-overview">
+    <div class="row between">
+      <div><h1>Overview</h1><p class="sub">Requests routed through <span class="mono">model: "auto"</span>.</p></div>
+      <div class="tabs-s" id="window">
+        <button data-h="1">1h</button><button data-h="24" class="active">24h</button><button data-h="168">7d</button><button data-h="720">30d</button>
+      </div>
+    </div>
+    <div class="grid g6" id="stats"></div>
+    <div class="grid g2 mt">
+      <div class="card"><h2>Requests</h2><div id="chart"></div></div>
+      <div class="card"><h2>Models selected</h2><div id="modelShare"></div></div>
+    </div>
+    <div class="grid g3 mt">
+      <div class="card"><h2>Task types</h2><div id="taskTypes"></div></div>
+      <div class="card"><h2>Complexity</h2><div id="complexity"></div></div>
+      <div class="card"><h2>Strategies</h2><div id="strategies"></div></div>
+    </div>
+    <div class="card mt"><h2>Per model</h2><div class="table-wrap" id="modelTable"></div></div>
+  </section>
+
+  <section id="view-playground" class="hidden">
+    <h1>Playground</h1>
+    <p class="sub">Send a prompt and inspect the routing decision.</p>
+    <div class="grid play">
+      <div class="card">
+        <label for="pPrompt">Prompt</label>
+        <textarea id="pPrompt">Build a production-ready FastAPI application with JWT authentication and PostgreSQL.</textarea>
+        <div class="grid g2 mt">
+          <div><label for="pStrategy">Strategy</label><select id="pStrategy"></select></div>
+          <div><label for="pModel">Model</label><select id="pModel"><option value="auto">auto</option></select></div>
+        </div>
+        <div class="grid g2 mt">
+          <div><label for="pMax">Max tokens</label><input id="pMax" type="number" min="1" value="1024"></div>
+          <div><label for="pGuard">Guardrails</label><select id="pGuard"><option value="false">Off</option><option value="true">On</option></select></div>
+        </div>
+        <div class="mt-s"><label for="pSystem">System prompt (optional)</label><input id="pSystem" placeholder="You are a helpful assistant."></div>
+        <div class="row mt">
+          <button class="btn primary" id="pSend">Send</button>
+          <button class="btn" id="pDry">Route only</button>
+          <span class="muted" id="pState"></span>
+        </div>
+        <div id="pAnswerWrap" class="hidden mt">
+          <label>Response</label>
+          <div id="pReasoningWrap" class="hidden"><div class="reasoning" id="pReasoning"></div></div>
+          <div class="answer mt-s" id="pAnswer"></div>
+        </div>
+      </div>
+      <div id="pTrace"><div class="card empty">The routing decision appears here.</div></div>
+    </div>
+  </section>
+
+  <section id="view-traces" class="hidden">
+    <div class="row between">
+      <div><h1>Traces</h1><p class="sub">Every routing decision, newest first.</p></div>
+      <div class="row">
+        <select id="tStatus" style="width:auto"><option value="">All statuses</option><option>success</option><option>error</option><option>blocked</option><option>planned</option></select>
+        <button class="btn" id="tRefresh">Refresh</button>
+      </div>
+    </div>
+    <div class="card"><div class="table-wrap" id="traceTable"></div>
+      <div class="row between mt"><span class="muted" id="tCount"></span>
+        <div class="row"><button class="btn sm" id="tPrev">Previous</button><button class="btn sm" id="tNext">Next</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-models" class="hidden">
+    <h1>Models</h1>
+    <p class="sub">Registry from <span class="mono">config/models.yaml</span>. A model is available when its provider key is set.</p>
+    <div class="card"><div class="table-wrap" id="modelsTable"></div></div>
+  </section>
+</main>
+
+<div class="drawer-bg hidden" id="drawerBg"></div>
+<aside class="drawer hidden" id="drawer"></aside>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const STRATEGIES = ["balanced", "quality", "cheapest", "fastest", "privacy"];
+const state = { view: "overview", hours: 24, offset: 0, limit: 25, health: null };
+
+function money(v) {
+  if (v == null) return "—";
+  if (v === 0) return "$0";
+  if (Math.abs(v) < 0.01) return "$" + v.toPrecision(2);
+  return "$" + v.toFixed(2);
+}
+const ms = (v) => v == null ? "—" : v >= 1000 ? (v / 1000).toFixed(2) + "s" : Math.round(v) + "ms";
+const pct = (v) => v == null ? "—" : (v * 100).toFixed(v >= 0.995 || v === 0 ? 0 : 1) + "%";
+const n = (v) => v == null ? "—" : Number(v).toLocaleString();
+const ago = (t) => {
+  const s = Math.max(0, Date.now() / 1000 - t);
+  if (s < 60) return Math.round(s) + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return new Date(t * 1000).toLocaleDateString();
+};
+
+function headers(extra = {}) {
+  const key = localStorage.getItem("jevRouterKey");
+  return { "Content-Type": "application/json", ...(key ? { Authorization: "Bearer " + key } : {}), ...extra };
+}
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: headers(opts.headers) });
+  const text = await res.text();
+  let body; try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+  if (res.status === 401) { $("#keyRow").classList.remove("hidden"); }
+  if (!res.ok) {
+    const err = new Error(body?.error?.message || res.statusText || "Request failed");
+    err.body = body; err.status = res.status; throw err;
+  }
+  return { body, res };
+}
+
+function meters(obj, opts = {}) {
+  const entries = Object.entries(obj || {}).map(([k, v]) => [k, typeof v === "object" ? v[opts.key || "requests"] : v]);
+  if (!entries.length) return `<div class="empty">No data yet</div>`;
+  const total = opts.total ?? entries.reduce((a, [, v]) => a + v, 0);
+  const max = opts.max ?? Math.max(...entries.map(([, v]) => v));
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries.map(([k, v]) => {
+    const w = max ? (v / max) * 100 : 0;
+    const label = opts.format ? opts.format(v, total) : pct(total ? v / total : 0);
+    return `<div class="meter"><div class="name ${opts.mono ? "mono" : ""}" title="${esc(k)}">${esc(k)}</div><div class="track"><div class="fill ${opts.accent ? "accent" : ""}" style="width:${w.toFixed(1)}%"></div></div><div class="num muted">${label}</div></div>`;
+  }).join("");
+}
+
+function chart(series, step) {
+  if (!series.some((p) => p.requests)) return `<div class="empty">No requests in this window</div>`;
+  const W = 560, H = 160, pad = 18;
+  const max = Math.max(...series.map((p) => p.requests), 1);
+  const slot = (W - pad) / series.length;
+  const bw = Math.max(1, Math.min(24, slot * 0.7));
+  const fmt = step >= 86400 ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" };
+  const when = (t) => new Date(t * 1000).toLocaleString([], fmt);
+  const bars = series.map((p, i) => {
+    const h = p.requests ? Math.max(2, (p.requests / max) * (H - pad - 4)) : 0;
+    const x = pad + i * slot + (slot - bw) / 2;
+    return `<g><rect x="${(pad + i * slot).toFixed(1)}" y="0" width="${slot.toFixed(1)}" height="${H - pad}" fill="transparent"/><rect x="${x.toFixed(1)}" y="${(H - pad - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="#0a0a0a"/><title>${esc(when(p.t))}: ${p.requests} requests, ${money(p.cost)}</title></g>`;
+  }).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <line x1="${pad}" x2="${W}" y1="${H - pad}" y2="${H - pad}" stroke="#eaeaea"/>
+    <text x="0" y="10" font-size="10" fill="#8f8f8f">${max}</text>${bars}</svg>
+    <div class="row between faint" style="font-size:12px"><span>${esc(when(series[0].t))}</span><span>${esc(when(series[series.length - 1].t))}</span></div>`;
+}
+
+async function loadOverview() {
+  let a;
+  try { a = (await api(`/v1/analytics?hours=${state.hours}`)).body; }
+  catch (e) { $("#stats").innerHTML = `<div class="error" style="grid-column:1/-1">${esc(e.message)}</div>`; return; }
+  const stats = [
+    ["Requests", n(a.requests), `${n(a.route_calls)} route-only calls`],
+    ["Success rate", pct(a.success_rate), `fallback rate ${pct(a.fallback_rate)}`],
+    ["Spend", money(a.cost.actual), `${n(a.tokens.input + a.tokens.output)} tokens`],
+    ["Saved vs baseline", money(a.cost.saved), a.cost.saved_pct == null ? "baseline: strongest model" : `${a.cost.saved_pct}% of ${money(a.cost.baseline)}`],
+    ["Latency p50", ms(a.latency_ms.p50), `p95 ${ms(a.latency_ms.p95)}`],
+    ["Decision time", ms(a.latency_ms.decision_avg), "average, incl. Jev"],
+  ];
+  $("#stats").innerHTML = stats.map(([l, v, h]) => `<div class="card stat"><div class="label">${l}</div><div class="value">${v}</div><div class="hint">${esc(h)}</div></div>`).join("");
+  $("#chart").innerHTML = chart(a.timeseries, a.bucket_seconds);
+  $("#modelShare").innerHTML = meters(a.models, { mono: true, accent: true });
+  $("#taskTypes").innerHTML = meters(a.task_types);
+  $("#complexity").innerHTML = meters(a.complexity);
+  $("#strategies").innerHTML = meters(a.strategies);
+  const rows = Object.entries(a.models);
+  $("#modelTable").innerHTML = rows.length ? `<table><thead><tr><th>Model</th><th class="num">Requests</th><th class="num">Share</th><th class="num">Spend</th><th class="num">Avg latency</th><th class="num">Errors</th></tr></thead><tbody>${
+    rows.map(([k, m]) => `<tr><td class="mono">${esc(k)}</td><td class="num">${n(m.requests)}</td><td class="num">${pct(m.share)}</td><td class="num">${money(m.cost)}</td><td class="num">${ms(m.avg_latency_ms)}</td><td class="num">${m.errors ? `<span class="badge bad">${m.errors}</span>` : "0"}</td></tr>`).join("")
+  }</tbody></table>` : `<div class="empty">No routed requests yet. Try the Playground.</div>`;
+}
+
+function statusBadge(s) {
+  const cls = { success: "ok", planned: "blue", blocked: "warn", error: "bad" }[s] || "";
+  return `<span class="badge ${cls}">${esc(s || "—")}</span>`;
+}
+
+function traceView(t) {
+  if (t.endpoint && t.endpoint !== "chat" && t.endpoint !== "route_model") {
+    return `<div class="card"><div class="row between"><h2>${esc(t.endpoint)}</h2>${statusBadge(t.status)}</div>
+      <dl class="kv"><dt>Selected</dt><dd class="mono">${esc(t.selected_model)}</dd><dt>Decision</dt><dd>${esc(t.decision_engine)}</dd></dl>
+      <pre class="json mt">${esc(JSON.stringify(t.result ?? t, null, 2))}</pre></div>`;
+  }
+  const probs = t.model_probabilities || {};
+  const ranking = t.ranking || [];
+  const rejected = Object.entries(t.rejected || {});
+  const g = t.guardrails;
+  return `
+  <div class="card">
+    <div class="row between"><h2 style="margin:0">Decision</h2><div class="row">${statusBadge(t.status)}<span class="badge">${esc(t.decision_engine)}</span></div></div>
+    <div class="mt-s mono" style="font-size:18px;font-weight:600">${esc(t.selected_model)}</div>
+    ${t.fallback_used ? `<div class="mt-s"><span class="badge warn">fell back from ${esc(t.planned_model)}</span></div>` : ""}
+    ${t.routing_reason ? `<div class="reason mt">${esc(t.routing_reason)}</div>` : ""}
+    <dl class="kv mt">
+      <dt>Strategy</dt><dd>${esc(t.strategy)}</dd>
+      <dt>Task type</dt><dd>${esc(t.task_type)}</dd>
+      <dt>Complexity</dt><dd>${esc(t.complexity)} <span class="faint">(${t.complexity_score != null ? Number(t.complexity_score).toFixed(2) : "—"} / 3)</span></dd>
+      <dt>Confidence</dt><dd>${pct(t.confidence)} ${t.low_confidence ? `<span class="badge warn">low</span>` : ""}</dd>
+      <dt>Premium needed</dt><dd>${pct(t.premium_probability)}</dd>
+      <dt>Required level</dt><dd>${t.required_level != null ? Number(t.required_level).toFixed(2) : "—"}</dd>
+      <dt>Cost</dt><dd>${money(t.cost?.actual ?? t.cost?.estimated)} ${t.cost?.actual == null ? `<span class="faint">estimated</span>` : ""}${t.cost?.saved ? ` <span class="badge ok">saved ${money(t.cost.saved)} vs ${esc(t.cost.baseline_model)}</span>` : ""}</dd>
+      <dt>Latency</dt><dd>decision ${ms(t.latency_ms?.decision)} · Jev ${ms(t.latency_ms?.jev)} · upstream ${ms(t.latency_ms?.upstream)} · total ${ms(t.latency_ms?.total)}</dd>
+      ${t.usage ? `<dt>Tokens</dt><dd>${n(t.usage.prompt_tokens)} in · ${n(t.usage.completion_tokens)} out</dd>` : ""}
+      ${t.jev_model ? `<dt>Jev model</dt><dd class="mono">${esc(t.jev_model)}</dd>` : ""}
+      ${t.error ? `<dt>Error</dt><dd style="color:var(--bad)">${esc(t.error)}</dd>` : ""}
+    </dl>
+  </div>
+  ${Object.keys(probs).length ? `<div class="card mt"><h2>Jev model probabilities</h2>${meters(probs, { mono: true, accent: true, total: 1, max: 1, format: (v) => pct(v) })}</div>` : ""}
+  ${ranking.length ? `<div class="card mt"><h2>Ranking</h2><div class="table-wrap"><table><thead><tr><th>#</th><th>Model</th><th class="num">Score</th><th class="num">Est. cost</th><th>Components</th></tr></thead><tbody>${
+    ranking.map((r, i) => `<tr><td class="faint">${i + 1}</td><td class="mono">${esc(r.model)}${(t.fallback_chain || []).includes(r.model) && i > 0 ? ` <span class="badge">fallback</span>` : ""}</td><td class="num">${Number(r.score).toFixed(3)}</td><td class="num">${money(r.estimated_cost)}</td><td><div class="comp">${Object.entries(r.components || {}).map(([k, v]) => `<span>${esc(k)} ${Number(v).toFixed(2)}</span>`).join("")}</div></td></tr>`).join("")
+  }</tbody></table></div></div>` : ""}
+  ${g ? `<div class="card mt"><div class="row between"><h2 style="margin:0">Guardrails</h2><span class="badge ${{ allow: "ok", review: "warn", deny: "bad" }[g.verdict] || ""}">${esc(g.verdict)}</span></div><div class="mt-s">${meters(g.checks, { total: 1, max: 1, format: (v) => pct(v) })}</div>${(g.reasons || []).length ? `<div class="muted mt-s" style="font-size:12px">${g.reasons.map(esc).join("<br>")}</div>` : ""}</div>` : ""}
+  ${t.tools ? `<div class="card mt"><h2>Tool pruning</h2><dl class="kv"><dt>Kept</dt><dd class="mono">${esc(t.tools.kept.join(", "))}</dd><dt>Dropped</dt><dd class="mono">${esc(t.tools.dropped.join(", ") || "—")}</dd></dl></div>` : ""}
+  ${rejected.length ? `<div class="card mt"><h2>Filtered out</h2><div class="table-wrap"><table><tbody>${rejected.map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td class="muted">${esc(v)}</td></tr>`).join("")}</tbody></table></div></div>` : ""}
+  ${(t.attempts || []).length > 1 ? `<div class="card mt"><h2>Attempts</h2><pre class="json">${esc(JSON.stringify(t.attempts, null, 2))}</pre></div>` : ""}`;
+}
+
+async function loadModels() {
+  try {
+    const { body } = await api("/v1/models");
+    const models = body.data.filter((m) => !m.id.startsWith("auto"));
+    const sel = $("#pModel"), cur = sel.value;
+    sel.innerHTML = `<option value="auto">auto (Jev routes)</option>` + models.filter((m) => m.available).map((m) => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join("");
+    sel.value = [...sel.options].some((o) => o.value === cur) ? cur : "auto";
+    $("#modelsTable").innerHTML = `<table><thead><tr><th>Model</th><th>Status</th><th class="num">Quality</th><th class="num">Speed</th><th class="num">$ in / 1M</th><th class="num">$ out / 1M</th><th class="num">Context</th><th>Modalities</th><th>Notes</th></tr></thead><tbody>${
+      models.map((m) => `<tr><td><div class="mono">${esc(m.id)}</div><div class="faint" style="font-size:12px">${esc(m.description)}</div></td>
+        <td>${m.available ? `<span class="badge ok">available</span>` : `<span class="badge">${m.requires_key === false ? "disabled" : "no key"}</span>`}</td>
+        <td class="num">${m.quality}</td><td class="num">${m.speed}</td>
+        <td class="num">${m.pricing.input_per_1m}</td><td class="num">${m.pricing.output_per_1m}</td>
+        <td class="num">${n(m.context_window)}</td><td>${(m.modalities || []).map((x) => `<span class="badge">${esc(x)}</span>`).join(" ")}</td>
+        <td>${m.local ? `<span class="badge blue">local</span> ` : ""}${m.supports_tools ? `<span class="badge">tools</span>` : ""}</td></tr>`).join("")
+    }</tbody></table>`;
+  } catch (e) { $("#modelsTable").innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+}
+
+async function loadTraces() {
+  const status = $("#tStatus").value;
+  try {
+    const { body } = await api(`/v1/traces?limit=${state.limit}&offset=${state.offset}${status ? `&status=${encodeURIComponent(status)}` : ""}`);
+    $("#tCount").textContent = `${n(body.total)} total`;
+    $("#tPrev").disabled = state.offset === 0;
+    $("#tNext").disabled = body.data.length < state.limit;
+    $("#traceTable").innerHTML = body.data.length ? `<table><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Prompt</th><th>Selected</th><th>Task</th><th>Complexity</th><th class="num">Conf.</th><th class="num">Cost</th><th class="num">Latency</th><th>Rating</th></tr></thead><tbody>${
+      body.data.map((t) => `<tr class="click" data-id="${esc(t.id)}"><td class="muted" style="white-space:nowrap">${ago(t.created_at)}</td><td><span class="badge">${esc(t.endpoint)}</span></td><td>${statusBadge(t.status)}</td>
+        <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.prompt_preview)}">${esc(t.prompt_preview) || `<span class="faint">hidden</span>`}</td>
+        <td class="mono">${esc(t.selected_model)}${t.fallback_count ? ` <span class="badge warn">+${t.fallback_count}</span>` : ""}</td><td>${esc(t.task_type || "")}</td><td>${esc(t.complexity || "")}</td>
+        <td class="num">${pct(t.confidence)}</td><td class="num">${money(t.actual_cost ?? t.estimated_cost)}</td><td class="num">${ms(t.latency_ms)}</td>
+        <td>${t.feedback == null ? "" : t.feedback > 0 ? `<span class="badge ok">good</span>` : t.feedback < 0 ? `<span class="badge bad">bad</span>` : `<span class="badge">neutral</span>`}</td></tr>`).join("")
+    }</tbody></table>` : `<div class="empty">No traces yet</div>`;
+  } catch (e) { $("#traceTable").innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+}
+
+async function openTrace(id) {
+  const d = $("#drawer");
+  d.innerHTML = `<div class="muted">Loading…</div>`;
+  d.classList.remove("hidden"); $("#drawerBg").classList.remove("hidden");
+  try {
+    const t = (await api(`/v1/traces/${encodeURIComponent(id)}`)).body;
+    d.innerHTML = `<div class="row between"><div><h1 style="font-size:18px">Trace</h1><div class="mono faint">${esc(t.id)}</div></div><button class="btn sm" id="dClose">Close</button></div>
+      ${t.prompt_preview ? `<div class="card mt"><h2>Prompt</h2><div class="answer">${esc(t.prompt_preview)}</div></div>` : ""}
+      <div class="mt">${traceView(t)}</div>
+      <div class="card mt"><h2>Feedback</h2><div class="row"><button class="btn sm" data-fb="1">Good route</button><button class="btn sm" data-fb="0">Neutral</button><button class="btn sm" data-fb="-1">Bad route</button>
+        <input id="fbComment" placeholder="Comment (optional)" value="${esc(t.feedback_comment || "")}"></div>
+        <div class="muted mt-s" id="fbState">${t.feedback == null ? "Not rated" : `Rated ${t.feedback > 0 ? "good" : t.feedback < 0 ? "bad" : "neutral"}`}</div></div>
+      <details class="mt"><summary class="muted" style="cursor:pointer">Raw JSON</summary><pre class="json mt-s">${esc(JSON.stringify(t, null, 2))}</pre></details>`;
+    $("#dClose").onclick = closeDrawer;
+    $$("[data-fb]").forEach((b) => b.onclick = async () => {
+      try {
+        await api(`/v1/traces/${encodeURIComponent(id)}/feedback`, { method: "POST", body: JSON.stringify({ score: Number(b.dataset.fb), comment: $("#fbComment").value || null }) });
+        $("#fbState").textContent = "Saved";
+        if (state.view === "traces") loadTraces();
+      } catch (e) { $("#fbState").textContent = e.message; }
+    });
+  } catch (e) { d.innerHTML = `<div class="error">${esc(e.message)}</div>`; }
+}
+function closeDrawer() { $("#drawer").classList.add("hidden"); $("#drawerBg").classList.add("hidden"); }
+
+async function play(dry) {
+  const prompt = $("#pPrompt").value.trim();
+  if (!prompt) return;
+  const messages = [];
+  if ($("#pSystem").value.trim()) messages.push({ role: "system", content: $("#pSystem").value.trim() });
+  messages.push({ role: "user", content: prompt });
+  const opts = { strategy: $("#pStrategy").value, guardrails: $("#pGuard").value === "true" };
+  const model = $("#pModel").value;
+  const body = { model, messages, max_tokens: Number($("#pMax").value) || undefined, jev_router: opts };
+  $("#pSend").disabled = $("#pDry").disabled = true;
+  $("#pState").textContent = dry ? "Routing…" : "Routing and generating…";
+  $("#pAnswerWrap").classList.add("hidden");
+  const t0 = performance.now();
+  try {
+    if (dry) {
+      const { body: trace } = await api("/v1/route/model", { method: "POST", body: JSON.stringify(body) });
+      $("#pTrace").innerHTML = traceView(trace);
+    } else {
+      const { body: res } = await api("/v1/chat/completions", { method: "POST", body: JSON.stringify(body) });
+      const msg = res.choices?.[0]?.message || {};
+      $("#pAnswer").textContent = msg.content || (msg.tool_calls ? JSON.stringify(msg.tool_calls, null, 2) : "(empty response — the model may have spent its token budget on reasoning; raise max tokens)");
+      const reasoning = msg.reasoning_content || msg.reasoning;
+      $("#pReasoning").textContent = reasoning || "";
+      $("#pReasoningWrap").classList.toggle("hidden", !reasoning);
+      $("#pAnswerWrap").classList.remove("hidden");
+      $("#pTrace").innerHTML = traceView({ ...res.jev_router, endpoint: "chat" });
+    }
+    $("#pState").textContent = `Done in ${ms(performance.now() - t0)}`;
+  } catch (e) {
+    $("#pState").textContent = "";
+    const details = e.body?.error?.details;
+    $("#pTrace").innerHTML = `<div class="card"><div class="error">${esc(e.message)}</div>${details ? `<pre class="json mt">${esc(JSON.stringify(details, null, 2))}</pre>` : ""}</div>`;
+  } finally { $("#pSend").disabled = $("#pDry").disabled = false; }
+}
+
+async function health() {
+  try {
+    const res = await fetch("/health");
+    const h = await res.json();
+    state.health = h;
+    const ok = h.jev_configured && h.available_models.length;
+    $("#status").innerHTML = `<div class="dot ${ok ? "ok" : "bad"}"></div><span>${ok ? `v${esc(h.version)} · ${h.available_models.length} models` : !h.jev_configured ? "Jev key missing" : "No models available"}</span>`;
+    if (h.auth_enabled && !localStorage.getItem("jevRouterKey")) $("#keyRow").classList.remove("hidden");
+    if (!$("#pStrategy").dataset.init) { $("#pStrategy").value = h.default_strategy; $("#pStrategy").dataset.init = "1"; }
+  } catch { $("#status").innerHTML = `<div class="dot bad"></div><span>Offline</span>`; }
+}
+
+function show(view) {
+  state.view = view;
+  $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+  $$("main > section").forEach((s) => s.classList.toggle("hidden", s.id !== "view-" + view));
+  history.replaceState(null, "", "#" + view);
+  ({ overview: loadOverview, traces: loadTraces, models: loadModels, playground: loadModels })[view]();
+}
+
+$("#pStrategy").innerHTML = STRATEGIES.map((s) => `<option>${s}</option>`).join("");
+$$("#nav button").forEach((b) => b.onclick = () => show(b.dataset.view));
+$$("#window button").forEach((b) => b.onclick = () => { state.hours = Number(b.dataset.h); $$("#window button").forEach((x) => x.classList.toggle("active", x === b)); loadOverview(); });
+$("#pSend").onclick = () => play(false);
+$("#pDry").onclick = () => play(true);
+$("#pPrompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) play(false); });
+$("#tRefresh").onclick = loadTraces;
+$("#tStatus").onchange = () => { state.offset = 0; loadTraces(); };
+$("#tPrev").onclick = () => { state.offset = Math.max(0, state.offset - state.limit); loadTraces(); };
+$("#tNext").onclick = () => { state.offset += state.limit; loadTraces(); };
+$("#traceTable").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) openTrace(tr.dataset.id); });
+$("#drawerBg").onclick = closeDrawer;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+$("#keyInput").value = localStorage.getItem("jevRouterKey") || "";
+$("#keySave").onclick = () => { localStorage.setItem("jevRouterKey", $("#keyInput").value.trim()); $("#keyRow").classList.add("hidden"); show(state.view); };
+
+const VIEWS = ["overview", "playground", "traces", "models"];
+const viewFromHash = () => VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "overview";
+window.addEventListener("hashchange", () => { if (viewFromHash() !== state.view) show(viewFromHash()); });
+health();
+setInterval(health, 30000);
+show(viewFromHash());
+</script>
+</body>
+</html>

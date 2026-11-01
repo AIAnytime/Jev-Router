@@ -1,0 +1,269 @@
+# Jev Router model registry.
+#
+# A model is routable when `enabled: true` AND its provider is available
+# (provider key present, or `enabled_env` truthy for keyless providers like Ollama).
+#
+# quality: 1-10 capability rating used for complexity matching.
+# speed:   1-10 relative throughput/latency rating.
+# input_cost / output_cost: USD per 1M tokens (verify against your provider's pricing page).
+# description + strengths are shown to Jev when it chooses between eligible models.
+# only_when: specialist models that are only considered when the request needs one of these inputs.
+
+providers:
+  liquid:
+    type: openai
+    base_url: https://api.liquid.ai/openai/v1
+    api_key_env: LIQUID_API_KEY
+  openai:
+    type: openai
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+  anthropic:
+    type: anthropic
+    base_url: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY
+  gemini:
+    type: openai
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    api_key_env: GEMINI_API_KEY
+  deepseek:
+    type: openai
+    base_url: https://api.deepseek.com/v1
+    api_key_env: DEEPSEEK_API_KEY
+  groq:
+    type: openai
+    base_url: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+  openrouter:
+    type: openai
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+  ollama:
+    type: openai
+    base_url: http://localhost:11434/v1
+    requires_key: false
+    enabled_env: OLLAMA_ENABLED
+
+models:
+  # ---------------- Liquid AI (enabled with LIQUID_API_KEY)
+  - id: liquid/lfm3-1.7b
+    provider: liquid
+    model: lfm3-1.7b
+    description: Small, very fast Liquid reasoning model. Great for everyday chat, Q&A, rewriting, summaries, extraction and light reasoning.
+    strengths: [chat, short answers, summarization, extraction, classification, light reasoning]
+    quality: 5.0
+    speed: 9
+    input_cost: 0.08
+    output_cost: 0.20
+    context_window: 32768
+    modalities: [text]
+    reasoning: true
+  - id: liquid/lfm2.5-24b-a2b
+    provider: liquid
+    model: lfm2.5-24b-a2b
+    description: Liquid's largest model (24B MoE, 2B active). Strongest Liquid option for coding, multi-step reasoning, analysis and long-form technical writing.
+    strengths: [coding, multi-step reasoning, analysis, technical writing, math, planning]
+    quality: 6.2
+    speed: 8
+    input_cost: 0.05
+    output_cost: 0.70
+    context_window: 32768
+    modalities: [text]
+    reasoning: true
+  - id: liquid/lfm3-vl-2b
+    provider: liquid
+    model: lfm3-vl-2b
+    description: Liquid vision-language model for understanding images, screenshots, charts and documents.
+    strengths: [image understanding, OCR, charts, screenshots]
+    quality: 4.5
+    speed: 8
+    input_cost: 0.10
+    output_cost: 0.50
+    context_window: 32768
+    modalities: [text, image]
+    only_when: [image]
+  - id: liquid/lfm3-audio-2b
+    provider: liquid
+    model: lfm3-audio-2b
+    description: Liquid audio model for speech understanding and transcription.
+    strengths: [speech, audio understanding, transcription]
+    quality: 4.0
+    speed: 8
+    input_cost: 0.10
+    output_cost: 1.00
+    context_window: 32768
+    modalities: [text, audio]
+    only_when: [audio]
+  - id: liquid/lfm3-omni-2b
+    provider: liquid
+    model: lfm3-omni-2b
+    description: Liquid omni model that accepts text, images and audio together.
+    strengths: [mixed image and audio input, multimodal]
+    quality: 4.2
+    speed: 8
+    input_cost: 0.10
+    output_cost: 1.00
+    context_window: 32768
+    modalities: [text, image, audio]
+    only_when: [image, audio]
+
+  # ---------------- OpenAI (enabled with OPENAI_API_KEY)
+  - id: openai/gpt-5
+    provider: openai
+    model: gpt-5
+    description: OpenAI frontier model for complex reasoning, production-grade coding and agentic tasks.
+    strengths: [complex reasoning, production coding, agentic tasks, math]
+    quality: 9.5
+    speed: 4
+    input_cost: 1.25
+    output_cost: 10.0
+    context_window: 400000
+    modalities: [text, image]
+    reasoning: true
+  - id: openai/gpt-5-mini
+    provider: openai
+    model: gpt-5-mini
+    description: Balanced OpenAI model with strong coding and reasoning at moderate cost.
+    strengths: [coding, reasoning, general tasks]
+    quality: 8.0
+    speed: 6
+    input_cost: 0.25
+    output_cost: 2.0
+    context_window: 400000
+    modalities: [text, image]
+    reasoning: true
+  - id: openai/gpt-5-nano
+    provider: openai
+    model: gpt-5-nano
+    description: Cheapest, fastest OpenAI model for simple chat, classification and extraction.
+    strengths: [simple chat, classification, extraction]
+    quality: 6.0
+    speed: 8
+    input_cost: 0.05
+    output_cost: 0.40
+    context_window: 400000
+    modalities: [text, image]
+
+  # ---------------- Anthropic (enabled with ANTHROPIC_API_KEY)
+  - id: anthropic/claude-opus-4-1
+    provider: anthropic
+    model: claude-opus-4-1
+    description: Anthropic's most capable model for the hardest coding, research and long-horizon agentic work.
+    strengths: [hardest coding, deep research, long context, agents]
+    quality: 9.6
+    speed: 3
+    input_cost: 15.0
+    output_cost: 75.0
+    context_window: 200000
+    max_output_tokens: 32000
+    modalities: [text, image]
+  - id: anthropic/claude-sonnet-4-5
+    provider: anthropic
+    model: claude-sonnet-4-5
+    description: Anthropic's best coding model; excellent at complex software engineering and long context.
+    strengths: [complex coding, long context, agents, writing]
+    quality: 9.2
+    speed: 5
+    input_cost: 3.0
+    output_cost: 15.0
+    context_window: 200000
+    max_output_tokens: 64000
+    modalities: [text, image]
+  - id: anthropic/claude-haiku-4-5
+    provider: anthropic
+    model: claude-haiku-4-5
+    description: Fast, affordable Anthropic model for everyday coding and chat.
+    strengths: [fast coding, chat, summarization]
+    quality: 7.5
+    speed: 8
+    input_cost: 1.0
+    output_cost: 5.0
+    context_window: 200000
+    max_output_tokens: 64000
+    modalities: [text, image]
+
+  # ---------------- Google Gemini (enabled with GEMINI_API_KEY)
+  - id: gemini/gemini-2.5-pro
+    provider: gemini
+    model: gemini-2.5-pro
+    description: Google's strongest model; multimodal with a very large context window.
+    strengths: [multimodal, very long context, reasoning, coding]
+    quality: 9.0
+    speed: 4
+    input_cost: 1.25
+    output_cost: 10.0
+    context_window: 1000000
+    modalities: [text, image, audio]
+    reasoning: true
+  - id: gemini/gemini-2.5-flash
+    provider: gemini
+    model: gemini-2.5-flash
+    description: Fast multimodal Gemini model with large context at low cost.
+    strengths: [multimodal, long context, fast general tasks]
+    quality: 7.5
+    speed: 8
+    input_cost: 0.30
+    output_cost: 2.50
+    context_window: 1000000
+    modalities: [text, image, audio]
+
+  # ---------------- DeepSeek (enabled with DEEPSEEK_API_KEY)
+  - id: deepseek/deepseek-reasoner
+    provider: deepseek
+    model: deepseek-reasoner
+    description: DeepSeek reasoning model; strong at math, logic and coding at low cost.
+    strengths: [math, logic, reasoning, coding]
+    quality: 8.3
+    speed: 3
+    input_cost: 0.55
+    output_cost: 2.19
+    context_window: 128000
+    modalities: [text]
+    supports_tools: false
+    reasoning: true
+  - id: deepseek/deepseek-chat
+    provider: deepseek
+    model: deepseek-chat
+    description: DeepSeek general model; good coding and chat at very low cost.
+    strengths: [coding, chat, general tasks]
+    quality: 7.8
+    speed: 6
+    input_cost: 0.27
+    output_cost: 1.10
+    context_window: 128000
+    modalities: [text]
+
+  # ---------------- Groq (enabled with GROQ_API_KEY)
+  - id: groq/llama-3.3-70b
+    provider: groq
+    model: llama-3.3-70b-versatile
+    description: Llama 3.3 70B on Groq hardware; extremely low latency for general tasks.
+    strengths: [ultra-low latency, general chat, summarization]
+    quality: 6.8
+    speed: 10
+    input_cost: 0.59
+    output_cost: 0.79
+    context_window: 128000
+    modalities: [text]
+
+  # ---------------- Local via Ollama (enabled with OLLAMA_ENABLED=true)
+  - id: ollama/llama3.2
+    provider: ollama
+    model: llama3.2:3b
+    description: Local Llama 3.2 3B running on your own hardware. Private; data never leaves the machine.
+    strengths: [private inference, simple chat, offline]
+    quality: 3.5
+    speed: 7
+    context_window: 8192
+    modalities: [text]
+    local: true
+  - id: ollama/qwen2.5-coder
+    provider: ollama
+    model: qwen2.5-coder:7b
+    description: Local Qwen 2.5 Coder 7B for private coding help.
+    strengths: [private inference, coding]
+    quality: 5.0
+    speed: 5
+    context_window: 32768
+    modalities: [text]
+    local: true

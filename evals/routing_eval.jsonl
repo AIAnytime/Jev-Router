@@ -1,0 +1,30 @@
+{"prompt": "hey, how are you?", "tier": "light", "task_type": "chat"}
+{"prompt": "Thanks, that worked!", "tier": "light", "task_type": "chat"}
+{"prompt": "What is the capital of Australia?", "tier": "light", "task_type": "chat"}
+{"prompt": "Translate 'Where is the train station?' into Spanish.", "tier": "light", "task_type": "translation"}
+{"prompt": "Translate this to French: The meeting has been moved to Thursday at 3pm.", "tier": "light", "task_type": "translation"}
+{"prompt": "What is 15% of 80?", "tier": "light", "task_type": "math"}
+{"prompt": "Summarize in one sentence: The city council voted 7-2 on Tuesday to approve a new bike lane on Main Street. Construction starts in May and should take six weeks. Local businesses were split on the plan.", "tier": "light", "task_type": "summarization"}
+{"prompt": "Extract the email address from this text: 'Contact Jane at jane.doe@example.com or call 555-0134.'", "tier": "light", "task_type": "extraction"}
+{"prompt": "Pull the date, amount and vendor out of: 'Invoice from Acme Corp dated 2026-03-14 for $1,240.00.' Return JSON.", "tier": "light", "task_type": "extraction"}
+{"prompt": "Write a Python function that reverses a string.", "tier": "light", "task_type": "coding"}
+{"prompt": "How do I list all files in a directory with bash?", "tier": "light", "task_type": "coding"}
+{"prompt": "Rewrite this to sound more polite: 'Send me the report now.'", "tier": "light", "task_type": "writing"}
+{"prompt": "Give me three name ideas for a coffee shop.", "tier": "light", "task_type": "writing"}
+{"prompt": "Is a tomato a fruit or a vegetable?", "tier": "light", "task_type": "chat"}
+{"prompt": "Convert 72 degrees Fahrenheit to Celsius.", "tier": "light", "task_type": "math"}
+{"prompt": "Build a production-ready FastAPI application with JWT authentication, role-based access control, PostgreSQL via SQLAlchemy async, Alembic migrations, and a full pytest suite.", "tier": "heavy", "task_type": "coding"}
+{"prompt": "Implement a lock-free multi-producer multi-consumer queue in Rust, explain the memory ordering choices for every atomic operation, and prove it is free of the ABA problem.", "tier": "heavy", "task_type": "coding"}
+{"prompt": "Design a globally distributed rate limiter for an API serving 2 million requests per second across 6 regions. Cover consistency trade-offs, failure modes, data structures and how you would test it.", "tier": "heavy", "task_type": "reasoning"}
+{"prompt": "Prove that there are infinitely many primes of the form 4k+3, then explain why the same elementary argument does not work for primes of the form 4k+1.", "tier": "heavy", "task_type": "math"}
+{"prompt": "Our Postgres primary hits 100% CPU every night at 02:00 and replication lag grows to 40 minutes. We run pg 15, logical replication to an analytics replica, and a nightly batch that upserts 30M rows. Walk through a rigorous diagnosis plan and the most likely root causes.", "tier": "heavy", "task_type": "analysis"}
+{"prompt": "Refactor this legacy Java monolith's order service into event-driven microservices: propose bounded contexts, the event schema, the migration plan using the strangler fig pattern, and how to keep data consistent during the transition.", "tier": "heavy", "task_type": "coding"}
+{"prompt": "Derive the backpropagation equations for a transformer's multi-head self-attention layer, including layer norm and residual connections, and show how they map to an efficient fused CUDA kernel.", "tier": "heavy", "task_type": "math"}
+{"prompt": "Compare the long-term economic effects of carbon taxes versus cap-and-trade systems, using evidence from at least three real-world programs, and recommend a policy for a mid-sized export-driven economy.", "tier": "heavy", "task_type": "analysis"}
+{"prompt": "Write a compiler front end for a small statically typed language with generics: lexer, recursive-descent parser, Hindley-Milner type inference, and clear error messages. Use TypeScript.", "tier": "heavy", "task_type": "coding"}
+{"prompt": "A farmer has a 3-gallon jug and a 5-gallon jug and needs exactly 4 gallons. Then generalize: for which pairs (a, b) is every integer volume up to max(a, b) reachable? Prove your claim.", "tier": "heavy", "task_type": "reasoning"}
+{"prompt": "Audit this smart contract design for reentrancy, oracle manipulation and governance attacks: a lending pool that uses a single DEX spot price for collateral valuation and allows flash-loan-funded votes.", "tier": "heavy", "task_type": "analysis"}
+{"prompt": "Write a detailed technical design document for migrating a 400-table Oracle database to PostgreSQL with zero downtime, including CDC tooling, validation strategy, cutover runbook and rollback plan.", "tier": "heavy", "task_type": "writing"}
+{"prompt": "Explain why my Kubernetes pods are OOMKilled even though the JVM heap is set to 75% of the container limit, and give a tuning plan covering metaspace, direct buffers, thread stacks and GC choice.", "tier": "heavy", "task_type": "analysis"}
+{"prompt": "Implement a Raft consensus module in Go with leader election, log replication, snapshotting and membership changes, plus a deterministic simulation test harness.", "tier": "heavy", "task_type": "coding"}
+{"prompt": "Formulate the vehicle routing problem with time windows as a mixed-integer program, then describe a column generation approach and how to obtain tight lower bounds.", "tier": "heavy", "task_type": "math"}

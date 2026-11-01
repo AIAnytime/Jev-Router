@@ -1,0 +1,80 @@
+import time
+from dataclasses import asdict, dataclass
+from typing import Any
+
+from ..providers import Provider, ProviderError
+from ..registry import ModelSpec, Registry
+
+
+@dataclass
+class Attempt:
+    model: str
+    provider: str
+    status: str
+    latency_ms: float
+    http_status: int | None = None
+    error: str | None = None
+
+
+class AllProvidersFailed(Exception):
+    def __init__(self, attempts: list[Attempt]):
+        self.attempts = attempts
+        last = attempts[-1] if attempts else None
+        self.status = (last.http_status if last else None) or 502
+        super().__init__(f"all {len(attempts)} provider attempt(s) failed; last: {last.error if last else 'n/a'}")
+
+
+def attempts_dict(attempts: list[Attempt]) -> list[dict[str, Any]]:
+    return [asdict(a) for a in attempts]
+
+
+class Executor:
+    """Runs the ranked candidates in order, falling back to the next model on any provider error."""
+
+    def __init__(self, registry: Registry, providers: dict[str, Provider]):
+        self.registry = registry
+        self.providers = providers
+
+    def _provider(self, model: ModelSpec) -> tuple[Provider, Any]:
+        spec = self.registry.provider_for(model)
+        return self.providers[spec.type], spec
+
+    async def complete(
+        self, chain: list[ModelSpec], payload: dict[str, Any]
+    ) -> tuple[ModelSpec, dict[str, Any], list[Attempt]]:
+        attempts: list[Attempt] = []
+        for model in chain:
+            provider, spec = self._provider(model)
+            start = time.perf_counter()
+            try:
+                result = await provider.complete(spec, model, payload)
+            except ProviderError as e:
+                attempts.append(Attempt(model.id, spec.name, "error", _ms(start), e.status, e.message))
+                continue
+            attempts.append(Attempt(model.id, spec.name, "success", _ms(start), 200))
+            return model, result, attempts
+        raise AllProvidersFailed(attempts)
+
+    async def open_stream(self, chain: list[ModelSpec], payload: dict[str, Any]):
+        """Return (model, first_chunk, iterator, attempts). Fallback is only possible before the first chunk."""
+        attempts: list[Attempt] = []
+        for model in chain:
+            provider, spec = self._provider(model)
+            start = time.perf_counter()
+            stream = provider.stream(spec, model, payload)
+            try:
+                first = await anext(stream)
+            except StopAsyncIteration:
+                attempts.append(Attempt(model.id, spec.name, "error", _ms(start), 502, "empty stream"))
+                continue
+            except ProviderError as e:
+                attempts.append(Attempt(model.id, spec.name, "error", _ms(start), e.status, e.message))
+                await stream.aclose()
+                continue
+            attempts.append(Attempt(model.id, spec.name, "success", _ms(start), 200))
+            return model, first, stream, attempts
+        raise AllProvidersFailed(attempts)
+
+
+def _ms(start: float) -> float:
+    return round((time.perf_counter() - start) * 1000, 1)

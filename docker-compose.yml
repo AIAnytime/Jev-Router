@@ -1,0 +1,13 @@
+services:
+  jev-router:
+    build: .
+    image: jev-router:latest
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////app/data/jev_router.db
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    restart: unless-stopped
