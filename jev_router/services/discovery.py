@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 
@@ -14,9 +15,9 @@ class DiscoveryError(Exception):
 
 
 def _scrub(text: str, secrets: list[str | None]) -> str:
-    for s in secrets:
-        if s:
-            text = text.replace(s, "****")
+    forms = {f for s in secrets if s for f in (s, repr(s)[1:-1], s.encode("unicode_escape").decode())}
+    for f in sorted(forms, key=len, reverse=True):
+        text = text.replace(f, "****")
     return text[:300]
 
 
@@ -33,12 +34,12 @@ def _request_headers(type_: str, api_key: str | None, headers: dict[str, str] | 
 
 async def _get(client: httpx.AsyncClient, url: str, headers: dict[str, str]) -> tuple[int, bytes]:
     async with client.stream("GET", url, headers=headers, timeout=TIMEOUT, follow_redirects=False) as r:
-        body = b""
+        body = bytearray()
         async for chunk in r.aiter_bytes():
             body += chunk
             if len(body) > MAX_BYTES:
                 raise DiscoveryError("Response is larger than 1 MB.")
-        return r.status_code, body
+        return r.status_code, bytes(body)
 
 
 async def list_models(
@@ -52,23 +53,26 @@ async def list_models(
     request_headers = _request_headers(type_, api_key, headers)
     base = base_url.rstrip("/")
     try:
-        status, body = await _get(client, f"{base}/models", request_headers)
-        list_key, name_key = "data", "id"
-        if status == 404 and type_ == "openai":
-            origin = base[:-3] if base.endswith("/v1") else base
-            status, body = await _get(client, f"{origin}/api/tags", request_headers)
-            list_key, name_key = "models", "name"
+        async with asyncio.timeout(TIMEOUT):
+            status, body = await _get(client, f"{base}/models", request_headers)
+            list_key, name_key = "data", "id"
+            if status == 404 and type_ == "openai":
+                origin = base[:-3] if base.endswith("/v1") else base
+                status, body = await _get(client, f"{origin}/api/tags", request_headers)
+                list_key, name_key = "models", "name"
         if status != 200:
             raise DiscoveryError(f"HTTP {status}: {body.decode(errors='replace')}")
         items = json.loads(body).get(list_key) or []
         names = [str(i[name_key]) for i in items if isinstance(i, dict) and i.get(name_key)]
     except DiscoveryError as e:
         raise DiscoveryError(_scrub(str(e), secrets)) from None
-    except httpx.TimeoutException:
+    except (httpx.TimeoutException, TimeoutError):
         raise DiscoveryError(f"Timed out after {TIMEOUT:g} s.") from None
     except httpx.HTTPError as e:
         raise DiscoveryError(_scrub(f"Connection failed: {e}", secrets)) from None
-    except (ValueError, AttributeError, TypeError):
+    except UnicodeEncodeError:
+        raise DiscoveryError("Header values must be ASCII.") from None
+    except (ValueError, AttributeError, TypeError, RecursionError):
         raise DiscoveryError("Unexpected response format; expected an OpenAI-style model list.") from None
     return list(dict.fromkeys(names))[:MAX_MODELS]
 

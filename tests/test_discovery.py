@@ -1,8 +1,10 @@
 import asyncio
 
+import h11
 import httpx
 import pytest
 
+from jev_router.services import discovery
 from jev_router.services.discovery import MAX_BYTES, DiscoveryError, list_models, probe
 
 
@@ -53,13 +55,14 @@ def test_caps_models_at_500():
     (lambda r: httpx.Response(200, text="<html>"), "Unexpected response"),
     (lambda r: (_ for _ in ()).throw(httpx.ReadTimeout("slow", request=r)), "Timed out"),
     (lambda r: (_ for _ in ()).throw(httpx.ConnectError("refused", request=r)), "Connection failed"),
+    (lambda r: httpx.Response(401, text="x" * 282 + "sk-secret-123456" + "y" * 700), "HTTP 401"),
 ])
 def test_failures_are_scrubbed_and_trimmed(response, fragment):
     with pytest.raises(DiscoveryError) as e:
         call(response, api_key="sk-secret-123456", headers={"X-Team": "core-secret"})
     message = str(e.value)
     assert fragment in message and len(message) <= 300
-    assert "sk-secret-123456" not in message and "core-secret" not in message
+    assert "sk-secret-123456" not in message and "core-secret" not in message and "sk-secre" not in message
 
 
 def test_probe_reports_instead_of_raising():
@@ -67,3 +70,55 @@ def test_probe_reports_instead_of_raising():
     assert ok["ok"] and ok["models_found"] == 1 and ok["error"] is None and ok["latency_ms"] >= 0
     bad = call(lambda r: httpx.Response(500, text="boom"), fn=probe)
     assert bad["ok"] is False and bad["models_found"] == 0 and "HTTP 500" in bad["error"]
+
+
+def test_escaped_secret_in_protocol_error_is_scrubbed():
+    def handler(request):
+        try:
+            h11.Request(method="GET", target="/", headers=list(request.headers.raw))
+        except h11.LocalProtocolError as e:
+            raise httpx.LocalProtocolError(str(e)) from None
+        return httpx.Response(200, json={"data": []})
+    with pytest.raises(DiscoveryError) as e:
+        call(handler, api_key="sk-secret-123456\n")
+    message = str(e.value)
+    assert "Illegal header value" in message
+    assert "sk-secret-123456" not in message and "sk-secret-123456\\n" not in message
+
+
+def test_deeply_nested_json_is_a_format_error():
+    def handler(request):
+        return httpx.Response(200, content=b"[" * 200000)
+    with pytest.raises(DiscoveryError, match="Unexpected response"):
+        call(handler)
+    result = call(handler, fn=probe)
+    assert result["ok"] is False and "Unexpected response" in result["error"]
+
+
+def test_total_deadline_covers_slow_body(monkeypatch):
+    monkeypatch.setattr(discovery, "TIMEOUT", 0.05)
+
+    async def drip():
+        yield b'{"data": ['
+        await asyncio.sleep(0.5)
+        yield b"]}"
+
+    with pytest.raises(DiscoveryError, match="Timed out"):
+        call(lambda r: httpx.Response(200, content=drip()))
+
+
+def test_non_ascii_header_value():
+    with pytest.raises(DiscoveryError) as e:
+        call(lambda r: httpx.Response(200, json={"data": []}), headers={"X-Team": "caf\u00e9"})
+    assert str(e.value) == "Header values must be ASCII."
+
+
+def test_redirect_is_not_followed():
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path)
+        return httpx.Response(302, headers={"Location": "http://elsewhere/v1/models"})
+    with pytest.raises(DiscoveryError, match="HTTP 302"):
+        call(handler)
+    assert seen == ["/v1/models"]
