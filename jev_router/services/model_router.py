@@ -13,7 +13,7 @@ from ..engine.features import RequestFeatures, extract_features, tool_name
 from ..engine.filters import filter_models
 from ..engine.policy import PolicyEngine, RoutingPlan
 from ..providers import ProviderError
-from ..registry import ModelSpec, Registry
+from ..registry import ModelSpec, ProviderSpec, Registry
 from ..schemas import ChatCompletionRequest, RouterOptions
 from ..storage import TraceStore
 from .executor import AllProvidersFailed, Attempt, Executor, attempts_dict
@@ -44,6 +44,7 @@ class Routed:
     plan: RoutingPlan
     chain: list[ModelSpec]
     payload: dict[str, Any]
+    providers: dict[str, ProviderSpec]  # registry.providers as seen at planning time
     explicit: bool = False
     guard: GuardResult | None = None
     tools: dict[str, Any] | None = None
@@ -103,6 +104,8 @@ class ModelRouter:
     ) -> Routed:
         started = time.perf_counter()
         trace_id = f"jr-{uuid.uuid4().hex[:20]}"
+        # Snapshot before any await: a Registry.apply() mid-request must not change or remove our providers.
+        providers = self.registry.providers
         strategy, explicit = self.resolve(model_field, opts, header_strategy)
         features = extract_features(messages, payload)
 
@@ -161,6 +164,7 @@ class ModelRouter:
             plan=plan,
             chain=[r.model for r in plan.ranked[:chain_len]],
             payload=payload,
+            providers=providers,
             explicit=bool(explicit),
             guard=guard,
             tools=tool_info,
@@ -190,7 +194,7 @@ class ModelRouter:
         plan, f = routed.plan, routed.features
         s = plan.signals
         model = model or plan.selected.model
-        provider = self.registry.provider_for(model).name
+        provider = routed.providers[model.provider].name
         in_tok = int((usage or {}).get("prompt_tokens") or f.input_tokens)
         out_tok = int((usage or {}).get("completion_tokens") or 0)
         estimated = next((r.estimated_cost for r in plan.ranked if r.model.id == model.id), model.estimate_cost(f.input_tokens, f.output_tokens))
@@ -291,7 +295,7 @@ class ModelRouter:
         routed = await self.plan(body.messages, self.upstream_payload(body), opts, body.model, header_strategy)
         t0 = time.perf_counter()
         try:
-            model, result, attempts = await self.executor.complete(routed.chain, routed.payload)
+            model, result, attempts = await self.executor.complete(routed.chain, routed.payload, routed.providers)
         except AllProvidersFailed as e:
             trace = self.build_trace(routed, "error", attempts=e.attempts, error=str(e))
             await self.store.record(trace)
@@ -311,7 +315,7 @@ class ModelRouter:
         want_usage = bool((body.model_extra or {}).get("stream_options", {}).get("include_usage"))
         t0 = time.perf_counter()
         try:
-            model, first, stream, attempts = await self.executor.open_stream(routed.chain, routed.payload)
+            model, first, stream, attempts = await self.executor.open_stream(routed.chain, routed.payload, routed.providers)
         except AllProvidersFailed as e:
             trace = self.build_trace(routed, "error", attempts=e.attempts, stream=True, error=str(e))
             await self.store.record(trace)

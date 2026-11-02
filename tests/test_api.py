@@ -1,6 +1,7 @@
 import json
 import time
 
+import httpx
 import pytest
 
 SMALL = "liquid/lfm3-1.7b"
@@ -128,6 +129,28 @@ def test_fallback_to_next_model(client, upstream):
     assert [a["status"] for a in trace["attempts"]] == ["error", "success"]
 
 
+@pytest.mark.parametrize("error", [
+    OverflowError("connect(): port must be 0-65535."),
+    ExceptionGroup("connect", [OverflowError("port must be 0-65535")]),
+    httpx.InvalidURL("Invalid non-printable ASCII character in URL"),
+    OSError("Name or service not known"),
+])
+def test_transport_errors_fall_back(client, upstream, monkeypatch, error):
+    simple(upstream)
+    reply = upstream._chat
+
+    def chat_or_raise(body):
+        if body["model"] == "lfm3-1.7b":
+            raise error
+        return reply(body)
+
+    monkeypatch.setattr(upstream, "_chat", chat_or_raise)
+    body = chat(client).json()
+    assert body["model"] == LARGE
+    attempts = body["jev_router"]["attempts"]
+    assert [a["status"] for a in attempts] == ["error", "success"] and attempts[0]["http_status"] == 503
+
+
 def test_fallbacks_can_be_disabled(client, upstream):
     simple(upstream)
     upstream.fail_models = {"lfm3-1.7b"}
@@ -137,6 +160,45 @@ def test_fallbacks_can_be_disabled(client, upstream):
     assert err["code"] == "upstream_error" and len(err["details"]["attempts"]) == 1
     trace = client.get(f"/v1/traces/{err['trace_id']}").json()
     assert trace["status"] == "error"
+
+
+def test_in_flight_request_keeps_the_provider_it_planned_with(client, upstream, monkeypatch):
+    from jev_router.registry import ModelSpec, ProviderSpec
+
+    registry, decision = client.app.state.registry, client.app.state.decision
+    lab = ProviderSpec(name="lab", base_url="http://lab-old/v1", requires_key=False, source="custom")
+    model = ModelSpec(id="lab/m", provider="lab", model="m", description="m")
+    with_lab = ({**registry.base_providers, "lab": lab}, [*registry.base_models, model])
+    swaps = []
+    decide = decision.decide
+
+    async def decide_then_swap(*args, **kwargs):
+        signals = await decide(*args, **kwargs)
+        registry.apply(*swaps.pop(0))
+        return signals
+
+    monkeypatch.setattr(decision, "decide", decide_then_swap)
+
+    # Provider removed after planning: the completion still finishes on the old spec.
+    registry.apply(*with_lab)
+    swaps.append((registry.base_providers, registry.base_models))
+    r = chat(client, model="lab/m")
+    assert r.status_code == 200
+    assert r.json()["jev_router"]["provider"] == "lab"
+    assert str(upstream.chat_requests[-1].url) == "http://lab-old/v1/chat/completions"
+
+    # Provider edited after planning: the stream keeps the old base_url.
+    registry.apply(*with_lab)
+    moved = lab.model_copy(update={"base_url": "http://lab-new/v1"})
+    swaps.append(({**registry.base_providers, "lab": moved}, with_lab[1]))
+    with client.stream("POST", "/v1/chat/completions",
+                       json={"model": "lab/m", "stream": True, "messages": [{"role": "user", "content": "hi"}]}) as r:
+        assert r.status_code == 200
+        lines = [line for line in r.iter_lines() if line.startswith("data: ")]
+    assert lines[-1] == "data: [DONE]"
+    assert str(upstream.chat_requests[-1].url) == "http://lab-old/v1/chat/completions"
+    trace = wait_for_trace(client, r.headers["X-Jev-Router-Trace-Id"])
+    assert trace["status"] == "success" and trace["provider"] == "lab"
 
 
 def test_jev_outage_degrades_to_heuristic(client, upstream):
@@ -340,3 +402,10 @@ def test_traces_feedback_and_analytics(client, upstream):
     assert a["bucket_seconds"] == 300 and len(a["timeseries"]) >= 12
     week = client.get("/v1/analytics?hours=168").json()
     assert week["bucket_seconds"] == 86400 and sum(p["requests"] for p in week["timeseries"]) == 4
+
+
+def test_dashboard_has_settings_view(client):
+    html = client.get("/").text
+    assert 'data-view="settings"' in html and 'id="view-settings"' in html
+    assert 'sessionStorage.getItem("jevAdminKey")' in html
+    assert "Add a key in" in html and 'data-go="settings"' in html

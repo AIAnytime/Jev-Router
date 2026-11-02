@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..providers import Provider, ProviderError
-from ..registry import ModelSpec, Registry
+from ..registry import ModelSpec, ProviderSpec, Registry
 
 
 @dataclass
@@ -35,16 +35,17 @@ class Executor:
         self.registry = registry
         self.providers = providers
 
-    def _provider(self, model: ModelSpec) -> tuple[Provider, Any]:
-        spec = self.registry.provider_for(model)
+    def _provider(self, model: ModelSpec, specs: dict[str, ProviderSpec] | None = None) -> tuple[Provider, ProviderSpec]:
+        spec = specs[model.provider] if specs is not None else self.registry.provider_for(model)
         return self.providers[spec.type], spec
 
     async def complete(
-        self, chain: list[ModelSpec], payload: dict[str, Any]
+        self, chain: list[ModelSpec], payload: dict[str, Any], specs: dict[str, ProviderSpec] | None = None
     ) -> tuple[ModelSpec, dict[str, Any], list[Attempt]]:
+        """`specs` is the provider snapshot taken at planning time; without it the live registry is used."""
         attempts: list[Attempt] = []
         for model in chain:
-            provider, spec = self._provider(model)
+            provider, spec = self._provider(model, specs)
             start = time.perf_counter()
             try:
                 result = await provider.complete(spec, model, payload)
@@ -55,11 +56,11 @@ class Executor:
             return model, result, attempts
         raise AllProvidersFailed(attempts)
 
-    async def open_stream(self, chain: list[ModelSpec], payload: dict[str, Any]):
+    async def open_stream(self, chain: list[ModelSpec], payload: dict[str, Any], specs: dict[str, ProviderSpec] | None = None):
         """Return (model, first_chunk, iterator, attempts). Fallback is only possible before the first chunk."""
         attempts: list[Attempt] = []
         for model in chain:
-            provider, spec = self._provider(model)
+            provider, spec = self._provider(model, specs)
             start = time.perf_counter()
             stream = provider.stream(spec, model, payload)
             try:

@@ -43,6 +43,7 @@ providers:
     base_url: http://localhost:11434/v1
     requires_key: false
     enabled_env: OLLAMA_ENABLED
+    local: true
 
 models:
   # ---------------- Liquid AI (enabled with LIQUID_API_KEY)

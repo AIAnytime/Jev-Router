@@ -40,6 +40,7 @@ async def list_models(request: Request, _: str = Depends(authenticate)):
             "object": "model",
             "owned_by": m.provider,
             "available": registry.is_available(m),
+            "enabled": m.enabled,
             "requires_key": provider.requires_key,
             "enable_env": provider.api_key_env if provider.requires_key else provider.enabled_env,
             "upstream_model": m.model,

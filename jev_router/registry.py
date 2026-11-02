@@ -17,17 +17,40 @@ class ProviderSpec(BaseModel):
     api_key_env: str | None = None
     requires_key: bool = True
     enabled_env: str | None = None
-    headers: dict[str, str] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict, repr=False)
+    local: bool = False
+    source: Literal["builtin", "custom"] = "builtin"
+    stored_key: str | None = Field(None, repr=False, exclude=True)
+    stored_key_unreadable: bool = False
+    enabled_override: bool | None = None
+
+    @property
+    def env_key(self) -> str | None:
+        return (os.environ.get(self.api_key_env) or None) if self.api_key_env else None
 
     @property
     def api_key(self) -> str | None:
-        return os.environ.get(self.api_key_env) if self.api_key_env else None
+        return self.stored_key or self.env_key
+
+    @property
+    def key_status(self) -> Literal["settings", "unreadable", "env"] | None:
+        if self.stored_key:
+            return "settings"
+        if self.stored_key_unreadable:
+            return "unreadable"
+        if self.env_key:
+            return "env"
+        return None
+
+    @property
+    def enabled(self) -> bool:
+        if self.enabled_override is not None:
+            return self.enabled_override
+        return not self.enabled_env or os.environ.get(self.enabled_env, "").lower() in TRUTHY
 
     @property
     def available(self) -> bool:
-        if self.enabled_env and os.environ.get(self.enabled_env, "").lower() not in TRUTHY:
-            return False
-        return not self.requires_key or bool(self.api_key)
+        return self.enabled and (not self.requires_key or bool(self.api_key))
 
 
 class ModelSpec(BaseModel):
@@ -108,16 +131,32 @@ class Registry:
         agents: list[AgentSpec],
         router: RouterConfig,
     ):
+        self.validate(providers, models)
+        missing = set(STRATEGIES) - router.strategies.keys()
+        if missing:
+            raise ValueError(f"router.yaml is missing strategies: {sorted(missing)}")
         self.providers = providers
         self.models = models
         self.agents = agents
         self.router = router
+        self.base_providers = {name: p.model_copy(deep=True) for name, p in providers.items()}
+        self.base_models = [m.model_copy(deep=True) for m in models]
+
+    @staticmethod
+    def validate(providers: dict[str, ProviderSpec], models: list[ModelSpec]) -> None:
         unknown = {m.provider for m in models} - providers.keys()
         if unknown:
             raise ValueError(f"models reference unknown providers: {sorted(unknown)}")
-        missing = set(STRATEGIES) - router.strategies.keys()
-        if missing:
-            raise ValueError(f"router.yaml is missing strategies: {sorted(missing)}")
+        seen: set[str] = set()
+        dupes = sorted({m.id for m in models if m.id in seen or seen.add(m.id)})
+        if dupes:
+            raise ValueError(f"duplicate model ids: {dupes}")
+
+    def apply(self, providers: dict[str, ProviderSpec], models: list[ModelSpec]) -> None:
+        self.validate(providers, models)
+        # Always rebind to the new objects, never mutate in place: in-flight requests hold the old dict.
+        self.providers = providers
+        self.models = models
 
     @classmethod
     def load(cls, config_dir: str | Path) -> "Registry":
