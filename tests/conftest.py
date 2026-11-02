@@ -33,6 +33,7 @@ class FakeUpstream:
         self.reply = "Hello from the mock model."
         self.listed: dict[str, dict[str, Any]] = {}
         self.chat_requests: list[httpx.Request] = []
+        self.list_requests: list[httpx.Request] = []
 
     # -- Jev ---------------------------------------------------------------
     def _jev(self, body: dict[str, Any]) -> httpx.Response:
@@ -96,6 +97,7 @@ class FakeUpstream:
         })
 
     def _list(self, request: httpx.Request) -> httpx.Response:
+        self.list_requests.append(request)
         spec = self.listed.get(request.url.host)
         if spec is None:
             return httpx.Response(404, text="not found")
@@ -155,7 +157,8 @@ def make_client(tmp_path, upstream, provider_env):
             "jev_router_secret_file": str(tmp_path / "secret.key"),
         }
         values.update(overrides)
-        client = TestClient(create_app(Settings(**values), transport=upstream.transport), client=(client_host, 50000))
+        client = TestClient(create_app(Settings(**values), transport=upstream.transport),
+                            base_url="http://localhost", client=(client_host, 50000))
         client.__enter__()
         clients.append(client)
         return client

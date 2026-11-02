@@ -50,6 +50,24 @@ def test_access_rules(make_client):
     assert ok.status_code == 200 and ok.json()["access"] == "admin_key"
 
 
+def test_settings_rejects_foreign_origin_and_host(make_client):
+    local = make_client(client_host="127.0.0.1")
+    r = local.get("/v1/settings", headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403 and r.json()["error"]["code"] == "settings_forbidden"
+    assert local.patch(P + "/openai", json={"api_key": "sk-evil-000111222"}, headers={"Origin": "https://evil.example"}).status_code == 403
+    assert local.get("/v1/settings", headers={"Origin": "http://localhost:8787"}).status_code == 200
+    assert local.get("/v1/settings", headers={"Origin": "http://127.0.0.1:8787", "Host": "127.0.0.1:8787"}).status_code == 200
+    assert local.get("/v1/settings", headers={"Origin": "http://[::1]:8787", "Host": "[::1]:8787"}).status_code == 200
+    assert local.get("/v1/settings", headers={"Host": "evil.example"}).status_code == 403
+    assert local.get("/v1/settings", headers={"Host": "evil.example:8787"}).status_code == 403
+    assert local.get("/v1/settings", headers={"Origin": "null"}).status_code == 403
+    assert local.get("/v1/settings", headers={"Origin": "http://[::1"}).status_code == 403
+    assert make_client(client_host="::ffff:127.0.0.1").get("/v1/settings").status_code == 200
+    assert make_client(client_host="::ffff:10.0.0.5").get("/v1/settings").status_code == 403
+    remote = make_client(client_host="203.0.113.5", jev_router_admin_key="admin-secret-1")
+    assert remote.get("/v1/settings", headers={"Authorization": "Bearer admin-secret-1"}).status_code == 200
+
+
 @pytest.mark.parametrize("body,fragment", [
     ({"name": "Bad Name", "base_url": "http://x/v1"}, "name"),
     ({"name": "lab", "base_url": "ftp://x"}, "base_url"),
@@ -58,14 +76,17 @@ def test_access_rules(make_client):
     ({"name": "lab", "base_url": "http://x/v1", "headers": {"bad header": "v"}}, "headers"),
     ({"name": "lab", "base_url": "http://x/v1", "headers": {"X-Big": "v" * 2049}}, "headers"),
     ({"name": "lab", "base_url": "http://x/v1", "surprise": 1}, "surprise"),
-    ({"name": "lab", "base_url": "http://x/v1", "api_key": "lab-key-0001\n"}, "api_key"),
+    ({"name": "lab", "base_url": "http://x/v1", "api_key": "lab-key-0001\n"}, "api_key: Value error, must contain only printable ASCII"),
+    ({"name": "lab", "base_url": "http://x/v1", "api_key": "lab-key-caf\u00e9"}, "api_key: Value error, must contain only printable ASCII"),
     ({"name": "lab", "base_url": "http://x/v1", "headers": {"X-A": "v\r\nX-B: y"}}, "headers"),
+    ({"name": "lab", "base_url": "http://x/v1", "headers": {"X-Key: lab-key-0001": "v"}}, "invalid header name"),
+    ({"name": "lab", "base_url": "http://x/v1", "headers": {"X-A": "1", "x-a": "2"}}, "duplicate header name"),
 ])
 def test_provider_validation(admin, body, fragment):
     r = admin.post(P, json=body)
     assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_request"
     assert fragment in r.json()["error"]["message"]
-    assert "lab-key-0001" not in r.text and "X-B: y" not in r.text
+    assert "lab-key-" not in r.text and "X-B: y" not in r.text
 
 
 def test_conflicts_unknowns_and_model_validation(admin):
@@ -173,6 +194,20 @@ def test_discovery_failures_are_scrubbed(admin, upstream):
     assert t["ok"] is False and "lab-key-abcdef123456" not in t["error"]
     unsaved = admin.post(P + "/test", json={"type": "openai", "base_url": "https://nowhere.example/v1"}).json()
     assert unsaved["ok"] is False and "HTTP 404" in unsaved["error"]
+
+
+def test_probe_with_new_base_url_does_not_send_stored_secrets(admin, upstream):
+    key, header = "lab-key-abcdef123456", "hdr-team-value-7788"
+    admin.post(P, json={"name": "lab", "base_url": "https://lab.example/v1", "api_key": key, "headers": {"X-Team": header}})
+    upstream.listed["evil.example"] = {"models": ["m"]}
+    upstream.listed["lab.example"] = {"models": ["m"]}
+    assert admin.post(P + "/lab/test", json={"base_url": "https://evil.example/v1"}).json()["ok"] is True
+    sent = upstream.list_requests[-1]
+    assert sent.url.host == "evil.example" and "authorization" not in sent.headers and "x-team" not in sent.headers
+    assert admin.post(P + "/lab/test", json={"base_url": "https://lab.example/v1/"}).json()["ok"] is True
+    sent = upstream.list_requests[-1]
+    assert sent.url.host == "lab.example" and sent.headers["authorization"] == f"Bearer {key}"
+    assert sent.headers["x-team"] == header
 
 
 def test_secrets_never_leave_the_server(admin, upstream, caplog):

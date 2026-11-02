@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 import yaml
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
 from ..crypto import mask
 from ..registry import ModelSpec, ProviderSpec
@@ -15,11 +15,10 @@ from ..services.discovery import DiscoveryError, list_models, probe
 from ..services.settings_service import SettingsService
 from .deps import APIError, _extract_key
 
-LOOPBACK = {"127.0.0.1", "::1"}
+LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
 NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,31}$"
 HEADER_NAME = re.compile(r"^[A-Za-z0-9-]{1,64}$")
-PRINTABLE_PATTERN = r"^[\x20-\x7e]*$"
-PRINTABLE = re.compile(PRINTABLE_PATTERN)
+PRINTABLE = re.compile(r"[\x20-\x7e]*")
 NULLABLE_MODEL_FIELDS = {"max_output_tokens"}
 
 
@@ -30,12 +29,31 @@ async def require_admin(request: Request) -> None:
         if hmac.compare_digest(supplied.encode(), admin_key.encode()):
             return
         raise APIError(403, "A valid admin key is required for Settings.", "settings_forbidden", "permission_error")
-    host = request.client.host if request.client else ""
     proxied = "x-forwarded-for" in request.headers or "forwarded" in request.headers
-    if host in LOOPBACK and not proxied:
+    # Pages on other sites (and DNS-rebound names) also connect from 127.0.0.1; only Host/Origin expose them.
+    origin = request.headers.get("origin")
+    same_site = _hostname("//" + request.headers.get("host", "")) in LOOPBACK_NAMES and (
+        origin is None or _hostname(origin) in LOOPBACK_NAMES)
+    if _is_loopback_peer(request) and not proxied and same_site:
         return
     raise APIError(403, "Settings can only be managed from this machine. Set JEV_ROUTER_ADMIN_KEY to manage remotely.",
                    "settings_forbidden", "permission_error")
+
+
+def _is_loopback_peer(request: Request) -> bool:
+    try:
+        ip = ipaddress.ip_address(request.client.host if request.client else "")
+    except ValueError:
+        return False
+    mapped = getattr(ip, "ipv4_mapped", None)
+    return ip.is_loopback or bool(mapped and mapped.is_loopback)
+
+
+def _hostname(url: str) -> str | None:
+    try:
+        return urlsplit(url).hostname
+    except ValueError:
+        return None
 
 
 router = APIRouter(prefix="/v1/settings", tags=["settings"], dependencies=[Depends(require_admin)])
@@ -54,14 +72,16 @@ def clean_headers(value: dict[str, str] | None) -> dict[str, str] | None:
         return None
     if len(value) > 20:
         raise ValueError("at most 20 headers are allowed")
+    if len({name.lower() for name in value}) < len(value):
+        raise ValueError("duplicate header name")
     for name, v in value.items():
         if not HEADER_NAME.match(name):
-            raise ValueError(f"invalid header name '{name[:64]}'")
+            raise ValueError("invalid header name (use letters, digits and '-')")
         if name.lower() == "authorization":
             raise ValueError("set api_key instead of an Authorization header")
         if len(v) > 2048:
             raise ValueError(f"header '{name}' is longer than 2048 characters")
-        if not PRINTABLE.match(v):
+        if not PRINTABLE.fullmatch(v):
             raise ValueError(f"header '{name}' must be printable ASCII")
     return value
 
@@ -77,7 +97,13 @@ def is_local_url(url: str) -> bool:
     return ip.is_loopback or ip.is_private
 
 
-Secret = Annotated[str, Field(min_length=1, max_length=4096, pattern=PRINTABLE_PATTERN)]
+def _printable(value: str) -> str:
+    if not PRINTABLE.fullmatch(value):
+        raise ValueError("must contain only printable ASCII characters")
+    return value
+
+
+Secret = Annotated[str, Field(min_length=1, max_length=4096), AfterValidator(_printable)]
 Modality = Literal["text", "image", "audio"]
 
 
@@ -239,7 +265,9 @@ async def delete_provider(name: str, request: Request):
 async def probe_saved_provider(name: str, request: Request, body: SavedProviderProbe | None = None):
     p = _provider_or_404(request, name)
     body = body or SavedProviderProbe()
-    return await probe(request.app.state.http, p.type, body.base_url or p.base_url, body.api_key or p.api_key, p.headers)
+    if body.base_url and body.base_url != p.base_url:
+        return await probe(request.app.state.http, p.type, body.base_url, body.api_key)
+    return await probe(request.app.state.http, p.type, p.base_url, body.api_key or p.api_key, p.headers)
 
 
 @router.get("/providers/{name}/discover")
