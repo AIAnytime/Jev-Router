@@ -138,7 +138,9 @@ cp .env.example .env        # add your keys
 docker compose up -d --build
 ```
 
-Traces persist in `./data`. `./config` is mounted read-only, so you can edit the model registry and restart without rebuilding.
+Traces, Settings and `data/secret.key` persist in `./data`. `./config` is mounted read-only, so you can edit the model registry and restart without rebuilding.
+
+Inside Docker the dashboard is not on loopback, so set `JEV_ROUTER_ADMIN_KEY` in `.env` to use Settings. To reach Ollama on the host, use `http://host.docker.internal:11434/v1` as the Ollama base URL.
 
 ## Usage
 
@@ -271,18 +273,45 @@ On chat, `"guardrails": true` (or `always_on: true` in config) runs these checks
 
 ## Dashboard
 
-Open `http://localhost:8000/`. It has four pages:
+Open `http://localhost:8000/`. It has five pages:
 
 - **Overview.** Requests, success rate, spend, savings vs. the strongest model, latency, decision time, model mix, task types, complexity and strategies. Refreshes every 30 seconds.
 - **Playground.** Send a prompt (or route only), watch the answer stream in, and see why Jev picked the model: probabilities, ranking, score parts and filtered-out models.
 - **Traces.** Every decision, newest first, with search and endpoint/status filters, and a detail drawer. Mark routes good, neutral or bad to build a feedback dataset.
-- **Models.** The registry grouped by provider, with the env var that enables each one.
+- **Models.** The registry grouped by provider, including changes made in Settings, with what each disabled model needs.
+- **Settings.** Add provider keys, connect OpenAI-compatible servers and local Ollama, discover models and tune how Jev sees them. See [Settings](#settings).
 
 | Playground | Trace detail |
 | --- | --- |
 | ![Playground](docs/assets/dashboard-playground.png) | ![Trace](docs/assets/dashboard-trace.png) |
 
 If `JEV_ROUTER_API_KEYS` is set, the dashboard asks for a router key. The key is stored in your browser only.
+
+## Settings
+
+Settings lets you run Jev Router with your own keys and your own models, without editing YAML or restarting.
+
+- **Bring your own key.** Paste a key for any built-in provider (OpenAI, Anthropic, Gemini, DeepSeek, Groq, OpenRouter, Liquid). A saved key takes precedence over the one in `.env`. Remove it to fall back to `.env`.
+- **Any OpenAI-compatible server.** Add a provider with a name and base URL. Presets: Ollama, LM Studio, vLLM, llama.cpp, OpenRouter, Together, Fireworks, Mistral, or Custom. Optional extra headers and a Local flag, which the `privacy` strategy and `privacy: local_only` respect. Local is on by default for `localhost`, private network addresses and `host.docker.internal`.
+- **Discover models.** **Fetch models** lists what the server offers (`/models`, or Ollama's `/api/tags`). Pick the ones to add.
+- **Tune routing.** Per model: description and strengths (Jev reads these), quality, speed, cost per 1M tokens, context window, reasoning, tools, vision, on/off. Built-in models can be edited too; **Reset** returns them to `config/models.yaml`.
+- **Live.** Changes apply to the next request and clear the decision cache. In-flight requests finish on the model they started with.
+- **Export.** **Copy YAML** or **Download** gives your custom providers, models and overrides in `models.yaml` shape, without secrets, so you can commit them to config.
+
+Local models with Ollama:
+
+```bash
+ollama serve
+ollama pull qwen2.5:0.5b
+```
+
+Then open Settings → Ollama → **Enabled** → **Test connection** → **Fetch models** → **Add selected**.
+
+Access:
+
+- Without `JEV_ROUTER_ADMIN_KEY`, Settings only answers requests from the same machine: the client must be `127.0.0.1` or `::1`, with no proxy headers, a loopback `Host` header and, if the browser sends one, a loopback `Origin`. That stops other websites and DNS rebinding from driving Settings through your browser.
+- With `JEV_ROUTER_ADMIN_KEY` set, every Settings call needs it as `Authorization: Bearer <admin key>` or `x-api-key`. The dashboard asks for it once per browser session and sends it only to `/v1/settings`.
+- Router keys (`JEV_ROUTER_API_KEYS`) never grant Settings access.
 
 ## API reference
 
@@ -298,10 +327,18 @@ If `JEV_ROUTER_API_KEYS` is set, the dashboard asks for a router key. The key is
 | `GET` | `/v1/traces/{id}` | Full trace |
 | `POST` | `/v1/traces/{id}/feedback` | `{"score": -1 \| 0 \| 1, "comment": "..."}` |
 | `GET` | `/v1/analytics?hours=24` | Aggregated metrics and timeseries |
+| `GET` | `/v1/settings` | Settings access mode and warnings (admin key or loopback) |
+| `GET` `POST` | `/v1/settings/providers` | List providers (keys masked) or add an OpenAI-compatible provider |
+| `PATCH` `DELETE` | `/v1/settings/providers/{name}` | Update a provider, or delete a custom one / reset a built-in one |
+| `POST` | `/v1/settings/providers/test`, `/v1/settings/providers/{name}/test` | Test a connection with saved or unsaved values |
+| `GET` | `/v1/settings/providers/{name}/discover` | Models the provider offers |
+| `GET` `POST` | `/v1/settings/models` | List models with overrides, or add models in bulk |
+| `PATCH` `DELETE` | `/v1/settings/models/{id}` | Edit routing fields, or delete a custom model / reset a built-in one |
+| `GET` | `/v1/settings/export` | Custom providers, models and overrides as YAML, without secrets |
 | `GET` | `/health` | Status, available models, Jev configuration, cache stats |
 | `GET` | `/docs` | Interactive OpenAPI docs |
 
-Authentication: `Authorization: Bearer <router key>` or `x-api-key: <router key>`. Rate limits are per key (`RATE_LIMIT_RPM`) and return `429` with `Retry-After`. Errors use the OpenAI error shape.
+Authentication: `Authorization: Bearer <router key>` or `x-api-key: <router key>`. `/v1/settings` uses the admin key instead (see [Settings](#settings)). Rate limits are per key (`RATE_LIMIT_RPM`) and return `429` with `Retry-After`. Errors use the OpenAI error shape.
 
 ## Configuration
 
@@ -315,6 +352,9 @@ Authentication: `Authorization: Bearer <router key>` or `x-api-key: <router key>
 | `<PROVIDER>_API_KEY` | | `LIQUID_`, `OPENAI_`, `ANTHROPIC_`, `GEMINI_`, `DEEPSEEK_`, `GROQ_`, `OPENROUTER_` |
 | `OLLAMA_ENABLED` | | `true` to route to a local Ollama |
 | `JEV_ROUTER_API_KEYS` | | Comma-separated client keys. Empty means open (local dev only). |
+| `JEV_ROUTER_ADMIN_KEY` | | Required for Settings from anywhere but the same machine |
+| `JEV_ROUTER_SECRET` | | Master secret that encrypts saved keys. Any string. |
+| `JEV_ROUTER_SECRET_FILE` | `data/secret.key` | Used when `JEV_ROUTER_SECRET` is empty. Created on first start with mode `0600`. |
 | `DEFAULT_STRATEGY` | `balanced` | Strategy when the request doesn't set one |
 | `CONFIDENCE_THRESHOLD` | `0.55` | Below this Jev confidence, bias toward stronger models |
 | `MAX_FALLBACKS` | `3` | Extra models to try after the first fails |
@@ -349,12 +389,12 @@ models:
     supports_tools: true
 ```
 
-Set `TOGETHER_API_KEY` and restart. The model is now part of routing. Strategy weights, the capability floor and guardrail thresholds are in [config/router.yaml](config/router.yaml).
+Set `TOGETHER_API_KEY` and restart. The model is now part of routing. [Settings](#settings) does the same from the dashboard without a restart, and its Export card turns those changes into this format. Strategy weights, the capability floor and guardrail thresholds are in [config/router.yaml](config/router.yaml).
 
 ## Development
 
 ```bash
-pytest                                  # 41 tests, no network needed (Jev and providers are mocked)
+pytest                                  # 112 tests, no network needed (Jev and providers are mocked)
 jev-router serve --reload --port 8000
 jev-router eval --jev-only
 ```
@@ -363,8 +403,8 @@ jev-router eval --jev-only
 jev_router/
   engine/      features, hard filters, Jev client, decision engine, policy engine, heuristic fallback, cache
   providers/   OpenAI-compatible and Anthropic adapters
-  services/    model router, executor (fallbacks + streaming), guardrails, agent and tool routers
-  api/         chat, routing, observability endpoints, auth and rate limiting
+  services/    model router, executor (fallbacks + streaming), guardrails, agent and tool routers, settings, discovery
+  api/         chat, routing, observability and settings endpoints, auth and rate limiting
   dashboard/   single-file dashboard
 config/        models.yaml, agents.yaml, router.yaml
 evals/         routing eval dataset
@@ -372,7 +412,10 @@ evals/         routing eval dataset
 
 ## Security
 
-- Provider and Jev keys are read from the environment on the server and are never returned by any endpoint.
+- Provider and Jev keys stay on the server and are never returned by any endpoint. Settings shows only a hint such as `sk-…a1b2`; header values are masked.
+- Keys saved in Settings are encrypted at rest (Fernet). The master secret comes from `JEV_ROUTER_SECRET` or `data/secret.key`. Back up `secret.key` together with the database: without it, saved keys can't be read and must be entered again.
+- Settings is limited to the same machine unless `JEV_ROUTER_ADMIN_KEY` is set. Set it for Docker and remote hosts.
+- **Test connection** on a saved provider with a changed base URL does not send the saved key or headers to the new URL; enter the key again to test it there.
 - Set `JEV_ROUTER_API_KEYS` for anything beyond localhost, and restrict `CORS_ORIGINS`.
 - Set `LOG_PROMPTS=false` to keep prompt text out of traces.
 - Use `privacy: local_only` or the `privacy` strategy to keep sensitive requests on your own hardware.
