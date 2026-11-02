@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     jev_router_api_keys: str = ""
     jev_router_config_dir: str = "config"
     database_url: str = "sqlite+aiosqlite:///./data/jev_router.db"
+    jev_router_admin_key: str = ""
+    jev_router_secret: str = ""
+    jev_router_secret_file: str = "data/secret.key"
 
     default_strategy: str = "balanced"
     confidence_threshold: float = 0.55
