@@ -140,7 +140,7 @@ docker compose up -d --build
 
 Traces, Settings and `data/secret.key` persist in `./data`. `./config` is mounted read-only, so you can edit the model registry and restart without rebuilding.
 
-Inside Docker the dashboard is not on loopback, so set `JEV_ROUTER_ADMIN_KEY` in `.env` to use Settings. To reach Ollama on the host, use `http://host.docker.internal:11434/v1` as the Ollama base URL.
+Inside Docker the dashboard is not on loopback, so set `JEV_ROUTER_ADMIN_KEY` in `.env` to use Settings. To reach Ollama on the host with Docker Desktop, use `http://host.docker.internal:11434/v1` as the Ollama base URL. On Linux, also add `extra_hosts: ["host.docker.internal:host-gateway"]` to the service and start Ollama with `OLLAMA_HOST=0.0.0.0`.
 
 ## Usage
 
@@ -305,7 +305,7 @@ ollama serve
 ollama pull qwen2.5:0.5b
 ```
 
-Then open Settings → Ollama → **Enabled** → **Test connection** → **Fetch models** → **Add selected**.
+Then open Settings → Ollama → **Enabled** → **Save** → **Test connection** → **Fetch models** → **Add selected**.
 
 Access:
 
@@ -338,7 +338,7 @@ Access:
 | `GET` | `/health` | Status, available models, Jev configuration, cache stats |
 | `GET` | `/docs` | Interactive OpenAPI docs |
 
-Authentication: `Authorization: Bearer <router key>` or `x-api-key: <router key>`. `/v1/settings` uses the admin key instead (see [Settings](#settings)). Rate limits are per key (`RATE_LIMIT_RPM`) and return `429` with `Retry-After`. Errors use the OpenAI error shape.
+Authentication: `Authorization: Bearer <router key>` or `x-api-key: <router key>`. `/v1/settings` uses the admin key, or same-machine access when none is set, instead (see [Settings](#settings)). Rate limits are per key (`RATE_LIMIT_RPM`) and return `429` with `Retry-After`. Errors use the OpenAI error shape.
 
 ## Configuration
 
@@ -413,7 +413,7 @@ evals/         routing eval dataset
 ## Security
 
 - Provider and Jev keys stay on the server and are never returned by any endpoint. Settings shows only a hint such as `sk-…a1b2`; header values are masked.
-- Keys saved in Settings are encrypted at rest (Fernet). The master secret comes from `JEV_ROUTER_SECRET` or `data/secret.key`. Back up `secret.key` together with the database: without it, saved keys can't be read and must be entered again.
+- Keys saved in Settings are encrypted at rest (Fernet). The master secret comes from `JEV_ROUTER_SECRET` or `data/secret.key`. Keep `JEV_ROUTER_SECRET` unchanged, or back up `secret.key` together with the database: without the same secret, saved keys can't be read and must be entered again.
 - Settings is limited to the same machine unless `JEV_ROUTER_ADMIN_KEY` is set. Set it for Docker and remote hosts.
 - **Test connection** on a saved provider with a changed base URL does not send the saved key or headers to the new URL; enter the key again to test it there.
 - Set `JEV_ROUTER_API_KEYS` for anything beyond localhost, and restrict `CORS_ORIGINS`.
