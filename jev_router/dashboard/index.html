@@ -1013,7 +1013,7 @@ function providerStatus(p) {
 function renderAccess(info, error) {
   const box = $("#sAccess");
   if (info) {
-    const secret = info.secret_source === "env" ? "Keys are encrypted with <code>JEV_ROUTER_SECRET</code>." : "Keys are encrypted with <code>data/secret.key</code>. Back it up with the database.";
+    const secret = info.secret_source === "env" ? "Keys are encrypted with <code>JEV_ROUTER_SECRET</code>." : `Keys are encrypted with <code>${esc(info.secret_file)}</code>. Back it up with the database.`;
     box.innerHTML = info.access === "admin_key"
       ? `<div class="row between wrap"><div><h2>Access</h2><p class="muted small mt-s" style="margin-bottom:0">Admin key accepted. ${secret}</p></div><button class="btn sm" id="sForget">Forget key</button></div>`
       : `<h2>Access</h2><p class="muted small mt-s" style="margin-bottom:0">Managing from this machine. Set <code>JEV_ROUTER_ADMIN_KEY</code> to manage remotely. ${secret}</p>`;

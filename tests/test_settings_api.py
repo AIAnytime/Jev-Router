@@ -37,7 +37,7 @@ def wait_for_trace(client, trace_id, tries=50):
     raise AssertionError(f"trace {trace_id} was never recorded")
 
 
-def test_access_rules(make_client):
+def test_access_rules(make_client, tmp_path):
     remote = make_client()
     r = remote.get("/v1/settings")
     assert r.status_code == 403 and r.json()["error"]["code"] == "settings_forbidden"
@@ -47,6 +47,11 @@ def test_access_rules(make_client):
     local = make_client(client_host="127.0.0.1")
     body = local.get("/v1/settings").json()
     assert body["access"] == "loopback" and body["secret_source"] == "env" and body["warnings"] == []
+    assert body["secret_file"] is None
+    key_file = tmp_path / "keys" / "master.key"
+    from_file = make_client(client_host="127.0.0.1", jev_router_secret="", jev_router_secret_file=str(key_file))
+    body = from_file.get("/v1/settings").json()
+    assert body["secret_source"] == "file" and body["secret_file"] == str(key_file)
     keyed = make_client(client_host="127.0.0.1", jev_router_admin_key="admin-secret-1", jev_router_api_keys="router-key-1")
     assert keyed.get("/v1/settings").status_code == 403
     assert keyed.get("/v1/settings", headers={"Authorization": "Bearer wrong"}).status_code == 403

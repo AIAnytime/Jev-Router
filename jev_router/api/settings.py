@@ -251,8 +251,11 @@ def model_view(request: Request, m: ModelSpec) -> dict[str, Any]:
 @router.get("")
 async def settings_overview(request: Request):
     svc = _svc(request)
-    return {"access": "admin_key" if request.app.state.settings.jev_router_admin_key else "loopback",
-            "secret_source": svc.box.source, "warnings": svc.warnings}
+    settings = request.app.state.settings
+    return {"access": "admin_key" if settings.jev_router_admin_key else "loopback",
+            "secret_source": svc.box.source,
+            "secret_file": settings.jev_router_secret_file if svc.box.source == "file" else None,
+            "warnings": svc.warnings}
 
 
 @router.get("/providers")
