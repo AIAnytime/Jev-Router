@@ -379,3 +379,10 @@ def test_traces_feedback_and_analytics(client, upstream):
     assert a["bucket_seconds"] == 300 and len(a["timeseries"]) >= 12
     week = client.get("/v1/analytics?hours=168").json()
     assert week["bucket_seconds"] == 86400 and sum(p["requests"] for p in week["timeseries"]) == 4
+
+
+def test_dashboard_has_settings_view(client):
+    html = client.get("/").text
+    assert 'data-view="settings"' in html and 'id="view-settings"' in html
+    assert 'sessionStorage.getItem("jevAdminKey")' in html
+    assert "Add a key in" in html and 'data-go="settings"' in html
