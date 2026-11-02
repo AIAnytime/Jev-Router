@@ -978,7 +978,11 @@ async function sapi(path, { text: asText = false, ...opts } = {}) {
   return text ? JSON.parse(text) : null;
 }
 const flip = (el) => el.setAttribute("aria-checked", String(el.getAttribute("aria-checked") !== "true"));
-const mpath = (id) => "/models/" + id.split("/").map(encodeURIComponent).join("/");
+const mpath = (id) => "/models/" + encodeURIComponent(id);
+async function busy(btn, fn) {
+  btn.disabled = true;
+  try { await fn(); } finally { if (btn.isConnected) btn.disabled = false; }
+}
 function guessLocal(url) {
   let host;
   try { host = new URL(url.trim()).hostname.replace(/^\[|\]$/g, ""); } catch { return false; }
@@ -1035,7 +1039,7 @@ function renderProviders() {
       <span class="prow-main"><span class="row wrap"><b>${esc(PROVIDERS[p.name] || p.name)}</b><span class="badge">${esc(p.type)}</span>${p.source === "custom" ? `<span class="badge violet">custom</span>` : ""}${p.local ? `<span class="badge">local</span>` : ""}</span>
         <span class="mono small muted ellip">${esc(p.base_url)}</span></span>
       <span class="small muted">${esc(keyText(p))}</span>
-      <span class="small muted num">${p.enabled_models}/${p.model_count} models</span>
+      <span class="small muted num">${esc(String(p.enabled_models))}/${esc(String(p.model_count))} models</span>
       <span class="badge ${cls}">${label}</span></button>`;
   }).join("") || empty("No providers");
 }
@@ -1077,8 +1081,8 @@ function advanced(p) {
 function modelEditor(m, i) {
   const ed = (f) => m.overridden.includes(f) ? `<span class="edited" title="Edited"></span>` : "";
   const id = (f) => `me${i}-${f}`;
-  const range = (f, label) => `<div><label for="${id(f)}">${label}${ed(f)} <output class="mono" data-out="${f}">${fixed(m[f], 1)}</output></label><input id="${id(f)}" data-f="${f}" type="range" min="1" max="10" step="0.1" value="${m[f]}"></div>`;
-  const num = (f, label, attrs) => `<div><label for="${id(f)}">${label}${ed(f)}</label><input id="${id(f)}" data-f="${f}" type="number" ${attrs} value="${m[f] ?? ""}"></div>`;
+  const range = (f, label) => `<div><label for="${id(f)}">${label}${ed(f)} <output class="mono" data-out="${f}">${fixed(m[f], 1)}</output></label><input id="${id(f)}" data-f="${f}" type="range" min="1" max="10" step="0.1" value="${esc(String(m[f]))}"></div>`;
+  const num = (f, label, attrs) => `<div><label for="${id(f)}">${label}${ed(f)}</label><input id="${id(f)}" data-f="${f}" type="number" ${attrs} value="${esc(String(m[f] ?? ""))}"></div>`;
   const sw = (t, label, on, f = t) => `<button type="button" class="switch" role="switch" data-t="${t}" aria-checked="${on}"><span class="knob"></span>${label}${ed(f)}</button>`;
   const flags = [
     m.source === "custom" ? `<span class="badge violet">custom</span>` : "",
@@ -1123,8 +1127,8 @@ function providerPanel(p) {
     ${p ? "" : `<div class="row wrap" id="fPresets">${PRESETS.map(([label], i) => `<button type="button" class="chip" data-preset="${i}">${esc(label)}</button>`).join("")}</div>`}
     <form class="card ${p ? "" : "mt"}" id="fForm" autocomplete="off">
       <div class="fgrid">
-        <div><label for="fName">Name</label><input id="fName" value="${esc(p?.name ?? "")}" ${p ? "readonly" : ""} placeholder="lmstudio" spellcheck="false"></div>
-        <div><label for="fUrl">Base URL</label><input id="fUrl" value="${esc(p?.base_url ?? "")}" placeholder="http://localhost:1234/v1" spellcheck="false"></div>
+        <div><label for="fName">Name</label><input id="fName" value="${esc(p?.name ?? "")}" ${p ? "readonly" : ""} placeholder="lmstudio" autocomplete="off" spellcheck="false"></div>
+        <div><label for="fUrl">Base URL</label><input id="fUrl" value="${esc(p?.base_url ?? "")}" placeholder="http://localhost:1234/v1" autocomplete="off" spellcheck="false"></div>
       </div>
       <div class="mt"><label for="fKey">API key</label><input id="fKey" type="password" autocomplete="new-password" placeholder="${p?.key.set ? "Leave empty to keep the current key" : "Optional for local servers"}">
         <div class="row wrap mt-s small"><span class="muted">${esc(keyLine(p))}</span>${savedKey ? `<button type="button" class="btn sm" id="fKeyClear">Remove saved key</button>` : ""}</div></div>
@@ -1178,16 +1182,18 @@ async function removeProvider(name, msg, close) {
   toast(msg);
   delete state.failed[name];
   await afterChange();
-  if (close) closeDrawer(); else openProvider(name);
+  if (close) { closeDrawer(); $("#sAdd").focus(); } else openProvider(name);
 }
 async function saveModel(box, m, provider) {
   const ch = modelChanges(box, m), res = $("[data-mres]", box);
   if (!Object.keys(ch).length) { res.className = "small muted"; res.textContent = "No changes."; return; }
-  try { await sapi(mpath(m.id), { method: "PATCH", body: JSON.stringify(ch) }); }
-  catch (e) { res.className = "small bad-text"; res.textContent = e.message; return; }
-  toast("Model saved");
-  await afterChange();
-  openProvider(provider, m.id);
+  await busy($("[data-msave]", box), async () => {
+    try { await sapi(mpath(m.id), { method: "PATCH", body: JSON.stringify(ch) }); }
+    catch (e) { res.className = "small bad-text"; res.textContent = e.message; return; }
+    toast("Model saved");
+    await afterChange();
+    openProvider(provider, m.id);
+  });
 }
 async function removeModel(m, provider, msg) {
   try { await sapi(mpath(m.id), { method: "DELETE" }); }
@@ -1195,6 +1201,7 @@ async function removeModel(m, provider, msg) {
   toast(msg);
   await afterChange();
   openProvider(provider, msg === "Model reset" ? m.id : null);
+  if (msg === "Model deleted") $("#fFetch")?.focus();
 }
 async function discover(name) {
   const box = $("#fFound");
@@ -1255,11 +1262,13 @@ function openProvider(name, openModel = null) {
       if (key) body.api_key = key;
       const h = headerRows();
       if (h) body.headers = h;
-      try { await sapi("/providers", { method: "POST", body: JSON.stringify(body) }); }
-      catch (err) { setResult(esc(err.message), "error"); return; }
-      toast("Provider added");
-      await afterChange();
-      openProvider(body.name);
+      await busy($("#fSave", d), async () => {
+        try { await sapi("/providers", { method: "POST", body: JSON.stringify(body) }); }
+        catch (err) { setResult(esc(err.message), "error"); return; }
+        toast("Provider added");
+        await afterChange();
+        openProvider(body.name);
+      });
       return;
     }
     const ch = {};
@@ -1273,7 +1282,7 @@ function openProvider(name, openModel = null) {
       if (state.hdrDirty && h) ch.headers = h;
     }
     if (!Object.keys(ch).length) { setResult("No changes to save.", "muted"); return; }
-    saveProvider(p.name, ch, "Saved");
+    await busy($("#fSave", d), () => saveProvider(p.name, ch, "Saved"));
   };
 
   $("#fTest", d).onclick = async (e) => {

@@ -173,6 +173,13 @@ class ModelCreate(ModelFields):
     provider: str = Field(pattern=NAME_PATTERN)
     model: str = Field(min_length=1, max_length=160, pattern=r"^\S+$")
 
+    @field_validator("model")
+    @classmethod
+    def _no_dot_segments(cls, v: str) -> str:
+        if any(part in (".", "..") for part in v.split("/")):
+            raise ValueError("must not contain '.' or '..' path segments")
+        return v
+
 
 def _svc(request: Request) -> SettingsService:
     return request.app.state.settings_service

@@ -106,6 +106,17 @@ def test_conflicts_unknowns_and_model_validation(admin):
         assert r.status_code == 400, bad
 
 
+@pytest.mark.parametrize("name", ["..", "../x", "a/./b", "../../providers/openai"])
+def test_model_names_reject_dot_segments(admin, name):
+    r = admin.post(M, json=[{"provider": "liquid", "model": name}])
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_request"
+    assert "model" in r.json()["error"]["message"]
+
+
+def test_model_routes_accept_an_encoded_slash(admin):
+    assert admin.patch(M + "/liquid%2Flfm3-1.7b", json={"speed": 7}).status_code == 200
+
+
 def test_builtin_key_and_ollama_enable(admin):
     r = admin.patch(P + "/openai", json={"api_key": "sk-test-openai-000111"})
     assert r.status_code == 200 and r.json()["available"]
