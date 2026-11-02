@@ -4,6 +4,7 @@ import re
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
+import httpx
 import yaml
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import PlainTextResponse
@@ -20,6 +21,9 @@ NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,31}$"
 HEADER_NAME = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 PRINTABLE = re.compile(r"[\x20-\x7e]*")
 NULLABLE_MODEL_FIELDS = {"max_output_tokens"}
+PROXY_HEADERS = ("x-forwarded-for", "forwarded", "x-real-ip", "x-forwarded-host", "x-forwarded-proto", "via")
+MANAGED_HEADERS = {"host", "content-length", "transfer-encoding", "connection", "content-type", "keep-alive", "upgrade",
+                   "te", "trailer", "proxy-authorization", "proxy-connection"}
 
 
 async def require_admin(request: Request) -> None:
@@ -29,15 +33,15 @@ async def require_admin(request: Request) -> None:
         if hmac.compare_digest(supplied.encode(), admin_key.encode()):
             return
         raise APIError(403, "A valid admin key is required for Settings.", "settings_forbidden", "permission_error")
-    proxied = "x-forwarded-for" in request.headers or "forwarded" in request.headers
+    proxied = any(h in request.headers for h in PROXY_HEADERS)
     # Pages on other sites (and DNS-rebound names) also connect from 127.0.0.1; only Host/Origin expose them.
     origin = request.headers.get("origin")
     same_site = _hostname("//" + request.headers.get("host", "")) in LOOPBACK_NAMES and (
         origin is None or _hostname(origin) in LOOPBACK_NAMES)
     if _is_loopback_peer(request) and not proxied and same_site:
         return
-    raise APIError(403, "Settings can only be managed from this machine. Set JEV_ROUTER_ADMIN_KEY to manage remotely.",
-                   "settings_forbidden", "permission_error")
+    raise APIError(403, "Settings can only be managed from this machine (open the dashboard via localhost or 127.0.0.1). "
+                   "Set JEV_ROUTER_ADMIN_KEY to manage remotely.", "settings_forbidden", "permission_error")
 
 
 def _is_loopback_peer(request: Request) -> bool:
@@ -61,9 +65,24 @@ router = APIRouter(prefix="/v1/settings", tags=["settings"], dependencies=[Depen
 
 def clean_url(value: str) -> str:
     value = value.strip()
-    parts = urlsplit(value)
+    if not PRINTABLE.fullmatch(value) or " " in value:
+        raise ValueError("must not contain spaces or control characters")
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        raise ValueError("must be an http or https URL with a host") from None
+    try:
+        parts.port
+    except ValueError:
+        raise ValueError("port must be 0-65535") from None
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise ValueError("must be an http or https URL with a host")
+    if "?" in value or "#" in value or parts.username is not None or parts.password is not None:
+        raise ValueError("must not include a query, fragment or credentials")
+    try:
+        httpx.URL(value)
+    except httpx.InvalidURL:
+        raise ValueError("must be a valid URL") from None
     return value.rstrip("/")
 
 
@@ -79,6 +98,8 @@ def clean_headers(value: dict[str, str] | None) -> dict[str, str] | None:
             raise ValueError("invalid header name (use letters, digits and '-')")
         if name.lower() == "authorization":
             raise ValueError("set api_key instead of an Authorization header")
+        if name.lower() in MANAGED_HEADERS:
+            raise ValueError(f"header '{name}' is managed by Jev Router")
         if len(v) > 2048:
             raise ValueError(f"header '{name}' is longer than 2048 characters")
         if not PRINTABLE.fullmatch(v):

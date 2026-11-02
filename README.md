@@ -310,6 +310,7 @@ Then open Settings → Ollama → **Enabled** → **Save** → **Test connection
 Access:
 
 - Without `JEV_ROUTER_ADMIN_KEY`, Settings only answers requests from the same machine: the client must be `127.0.0.1` or `::1`, with no proxy headers, a loopback `Host` header and, if the browser sends one, a loopback `Origin`. That stops other websites and DNS rebinding from driving Settings through your browser.
+- Behind any reverse proxy, including one on the same machine, set `JEV_ROUTER_ADMIN_KEY`: loopback mode can't detect a proxy that adds no forwarding headers.
 - With `JEV_ROUTER_ADMIN_KEY` set, every Settings call needs it as `Authorization: Bearer <admin key>` or `x-api-key`. The dashboard asks for it once per browser session and sends it only to `/v1/settings`.
 - Router keys (`JEV_ROUTER_API_KEYS`) never grant Settings access.
 
@@ -394,7 +395,7 @@ Set `TOGETHER_API_KEY` and restart. The model is now part of routing. [Settings]
 ## Development
 
 ```bash
-pytest                                  # 112 tests, no network needed (Jev and providers are mocked)
+pytest                                  # 133 tests, no network needed (Jev and providers are mocked)
 jev-router serve --reload --port 8000
 jev-router eval --jev-only
 ```
@@ -414,8 +415,9 @@ evals/         routing eval dataset
 
 - Provider and Jev keys stay on the server and are never returned by any endpoint. Settings shows only a hint such as `sk-…a1b2`; header values are masked.
 - Keys saved in Settings are encrypted at rest (Fernet). The master secret comes from `JEV_ROUTER_SECRET` or `data/secret.key`. Keep `JEV_ROUTER_SECRET` unchanged, or back up `secret.key` together with the database: without the same secret, saved keys can't be read and must be entered again.
-- Settings is limited to the same machine unless `JEV_ROUTER_ADMIN_KEY` is set. Set it for Docker and remote hosts.
-- **Test connection** on a saved provider with a changed base URL does not send the saved key or headers to the new URL; enter the key again to test it there.
+- Settings is limited to the same machine unless `JEV_ROUTER_ADMIN_KEY` is set. Set it for Docker and remote hosts. Behind any reverse proxy, including one on the same machine, set `JEV_ROUTER_ADMIN_KEY`: loopback mode can't detect a proxy that adds no forwarding headers.
+- Anyone with Settings access can point a provider at another URL and use its saved key, so treat the admin key like the provider keys.
+- **Test connection** on a saved provider with a changed base URL does not send the saved key or headers to the new URL; enter the key again to test it there. This is a convenience guard, not a security boundary.
 - Set `JEV_ROUTER_API_KEYS` for anything beyond localhost, and restrict `CORS_ORIGINS`.
 - Set `LOG_PROMPTS=false` to keep prompt text out of traces.
 - Use `privacy: local_only` or the `privacy` strategy to keep sensitive requests on your own hardware.

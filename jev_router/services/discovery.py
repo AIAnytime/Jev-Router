@@ -74,6 +74,8 @@ async def list_models(
         raise DiscoveryError("Header values must be ASCII.") from None
     except (ValueError, AttributeError, TypeError, RecursionError):
         raise DiscoveryError("Unexpected response format; expected an OpenAI-style model list.") from None
+    except Exception:
+        raise DiscoveryError("Connection failed.") from None
     return list(dict.fromkeys(names))[:MAX_MODELS]
 
 

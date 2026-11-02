@@ -149,7 +149,7 @@ class AnthropicProvider(Provider):
             resp = await self.client.post(
                 f"{spec.base_url.rstrip('/')}/messages", headers=self._headers(spec), json=to_anthropic(model, payload)
             )
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, httpx.InvalidURL, OSError, OverflowError, ExceptionGroup) as e:
             raise ProviderError(503, f"anthropic unreachable: {e.__class__.__name__}") from e
         await raise_for_status(resp)
         return from_anthropic(resp.json(), model.model)
@@ -203,7 +203,7 @@ class AnthropicProvider(Provider):
                         yield chunk({}, STOP_REASONS.get(reason, "stop"))
                     elif kind == "error":
                         raise ProviderError(502, ev.get("error", {}).get("message", "anthropic stream error"))
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, httpx.InvalidURL, OSError, OverflowError, ExceptionGroup) as e:
             raise ProviderError(503, f"anthropic stream failed: {e.__class__.__name__}") from e
         yield {
             "id": chunk_id, "object": "chat.completion.chunk", "created": created, "model": model.model,

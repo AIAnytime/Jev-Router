@@ -70,6 +70,9 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
                  ", ".join(m.id for m in available) or "none", "configured" if jev.configured else "NOT configured")
         if not settings.api_keys:
             log.warning("JEV_ROUTER_API_KEYS is empty: the router accepts unauthenticated requests")
+        if not settings.jev_router_admin_key:
+            log.warning("JEV_ROUTER_ADMIN_KEY is empty: Settings is limited to loopback; behind any reverse proxy, "
+                        "including one on this machine, set JEV_ROUTER_ADMIN_KEY")
         yield
         await s.model_router.drain()
         await http.aclose()

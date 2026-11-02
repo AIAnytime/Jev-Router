@@ -1,6 +1,7 @@
 import json
 import time
 
+import httpx
 import pytest
 
 SMALL = "liquid/lfm3-1.7b"
@@ -126,6 +127,28 @@ def test_fallback_to_next_model(client, upstream):
     trace = body["jev_router"]
     assert trace["fallback_used"] and trace["planned_model"] == SMALL
     assert [a["status"] for a in trace["attempts"]] == ["error", "success"]
+
+
+@pytest.mark.parametrize("error", [
+    OverflowError("connect(): port must be 0-65535."),
+    ExceptionGroup("connect", [OverflowError("port must be 0-65535")]),
+    httpx.InvalidURL("Invalid non-printable ASCII character in URL"),
+    OSError("Name or service not known"),
+])
+def test_transport_errors_fall_back(client, upstream, monkeypatch, error):
+    simple(upstream)
+    reply = upstream._chat
+
+    def chat_or_raise(body):
+        if body["model"] == "lfm3-1.7b":
+            raise error
+        return reply(body)
+
+    monkeypatch.setattr(upstream, "_chat", chat_or_raise)
+    body = chat(client).json()
+    assert body["model"] == LARGE
+    attempts = body["jev_router"]["attempts"]
+    assert [a["status"] for a in attempts] == ["error", "success"] and attempts[0]["http_status"] == 503
 
 
 def test_fallbacks_can_be_disabled(client, upstream):

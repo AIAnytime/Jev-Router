@@ -113,6 +113,16 @@ def test_non_ascii_header_value():
     assert str(e.value) == "Header values must be ASCII."
 
 
+def test_unexpected_transport_error_is_a_generic_failure():
+    def handler(request):
+        raise OverflowError("connect(): port must be 0-65535.")
+    with pytest.raises(DiscoveryError) as e:
+        call(handler, api_key="sk-secret-123456")
+    assert str(e.value) == "Connection failed."
+    result = call(handler, fn=probe)
+    assert result["ok"] is False and result["error"] == "Connection failed."
+
+
 def test_redirect_is_not_followed():
     seen = []
 

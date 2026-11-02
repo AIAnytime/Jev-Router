@@ -23,7 +23,7 @@ class OpenAICompatProvider(Provider):
         body.pop("stream_options", None)
         try:
             resp = await self.client.post(url, headers=headers, json=body)
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, httpx.InvalidURL, OSError, OverflowError, ExceptionGroup) as e:
             raise ProviderError(503, f"{spec.name} unreachable: {e.__class__.__name__}") from e
         await raise_for_status(resp)
         try:
@@ -47,5 +47,5 @@ class OpenAICompatProvider(Provider):
                         yield json.loads(data)
                     except ValueError:
                         continue
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, httpx.InvalidURL, OSError, OverflowError, ExceptionGroup) as e:
             raise ProviderError(503, f"{spec.name} stream failed: {e.__class__.__name__}") from e

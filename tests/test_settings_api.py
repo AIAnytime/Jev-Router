@@ -4,6 +4,11 @@ import time
 from unittest.mock import ANY
 
 import pytest
+import yaml
+
+from jev_router.registry import Registry
+
+from .conftest import ROOT
 
 P = "/v1/settings/providers"
 M = "/v1/settings/models"
@@ -36,18 +41,27 @@ def test_access_rules(make_client):
     remote = make_client()
     r = remote.get("/v1/settings")
     assert r.status_code == 403 and r.json()["error"]["code"] == "settings_forbidden"
-    assert "JEV_ROUTER_ADMIN_KEY" in r.json()["error"]["message"]
+    assert r.json()["error"]["message"] == (
+        "Settings can only be managed from this machine (open the dashboard via localhost or 127.0.0.1). "
+        "Set JEV_ROUTER_ADMIN_KEY to manage remotely.")
     local = make_client(client_host="127.0.0.1")
     body = local.get("/v1/settings").json()
     assert body["access"] == "loopback" and body["secret_source"] == "env" and body["warnings"] == []
-    assert local.get("/v1/settings", headers={"X-Forwarded-For": "1.2.3.4"}).status_code == 403
-    assert local.get(P, headers={"Forwarded": "for=1.2.3.4"}).status_code == 403
     keyed = make_client(client_host="127.0.0.1", jev_router_admin_key="admin-secret-1", jev_router_api_keys="router-key-1")
     assert keyed.get("/v1/settings").status_code == 403
     assert keyed.get("/v1/settings", headers={"Authorization": "Bearer wrong"}).status_code == 403
     assert keyed.get("/v1/settings", headers={"Authorization": "Bearer router-key-1"}).status_code == 403
     ok = keyed.get("/v1/settings", headers={"x-api-key": "admin-secret-1"})
     assert ok.status_code == 200 and ok.json()["access"] == "admin_key"
+
+
+@pytest.mark.parametrize("header,value", [
+    ("X-Forwarded-For", "1.2.3.4"), ("Forwarded", "for=1.2.3.4"), ("X-Real-IP", "1.2.3.4"),
+    ("X-Forwarded-Host", "jev.example"), ("X-Forwarded-Proto", "https"), ("Via", "1.1 proxy"),
+])
+def test_proxied_requests_are_refused(admin, header, value):
+    r = admin.get(P, headers={header: value})
+    assert r.status_code == 403 and r.json()["error"]["code"] == "settings_forbidden"
 
 
 def test_settings_rejects_foreign_origin_and_host(make_client):
@@ -81,6 +95,14 @@ def test_settings_rejects_foreign_origin_and_host(make_client):
     ({"name": "lab", "base_url": "http://x/v1", "headers": {"X-A": "v\r\nX-B: y"}}, "headers"),
     ({"name": "lab", "base_url": "http://x/v1", "headers": {"X-Key: lab-key-0001": "v"}}, "invalid header name"),
     ({"name": "lab", "base_url": "http://x/v1", "headers": {"X-A": "1", "x-a": "2"}}, "duplicate header name"),
+    ({"name": "lab", "base_url": "http://x/v1", "headers": {"Host": "elsewhere"}}, "header 'Host' is managed by Jev Router"),
+    ({"name": "lab", "base_url": "http://x/v1", "headers": {"transfer-encoding": "chunked"}}, "is managed by Jev Router"),
+    ({"name": "lab", "base_url": "http://x:99999/v1"}, "base_url: Value error, port must be 0-65535"),
+    ({"name": "lab", "base_url": "http://a\x7f/v1"}, "base_url: Value error, must not contain spaces or control"),
+    ({"name": "lab", "base_url": "http://h /v1"}, "base_url: Value error, must not contain spaces or control"),
+    ({"name": "lab", "base_url": "http://h/v1?x=1"}, "base_url: Value error, must not include a query"),
+    ({"name": "lab", "base_url": "http://h/v1#"}, "base_url: Value error, must not include a query"),
+    ({"name": "lab", "base_url": "http://u:p@h/v1"}, "base_url: Value error, must not include a query"),
 ])
 def test_provider_validation(admin, body, fragment):
     r = admin.post(P, json=body)
@@ -95,6 +117,8 @@ def test_conflicts_unknowns_and_model_validation(admin):
     assert admin.patch(P + "/openai", json={"headers": {"X-A": "b"}}).status_code == 400
     assert admin.patch(P + "/openai", json={"enabled": None}).status_code == 400
     assert admin.patch(P + "/openai", json={}).status_code == 400
+    assert admin.patch(P + "/openai", json={"base_url": "http://x:99999/v1"}).status_code == 400
+    assert provider(admin, "openai")["base_url"] == "https://api.openai.com/v1"
     assert admin.get(P + "/ghost/discover").status_code == 404
     assert admin.post(M, json=[{"provider": "liquid", "model": "lfm3-1.7b"}]).status_code == 409
     assert admin.post(M, json=[{"provider": "ghost", "model": "x"}]).status_code == 400
@@ -238,3 +262,25 @@ def test_secrets_never_leave_the_server(admin, upstream, caplog):
     bodies += [export.text, json.dumps(trace), caplog.text]
     for b in bodies:
         assert key not in b and header not in b
+
+
+def test_export_loads_back_through_the_registry(admin, tmp_path):
+    admin.post(P, json={"name": "lab", "base_url": "https://lab.example/v1", "api_key": "lab-key-abcdef123456"})
+    admin.post(M, json=[{"provider": "lab", "model": "qwen3-8b", "quality": 7, "strengths": ["chat"]}])
+    admin.patch(M + "/" + SMALL, json={"speed": 3})
+    admin.patch(P + "/openai", json={"base_url": "https://gateway.example/v1"})
+    exported = yaml.safe_load(admin.get("/v1/settings/export").text)
+    base = yaml.safe_load((ROOT / "config" / "models.yaml").read_text())
+    providers = {**base["providers"], **exported["providers"]}
+    replaced = {m["id"] for m in exported["models"]}
+    models = exported["models"] + [m for m in base["models"] if m["id"] not in replaced]
+    for f in ("agents.yaml", "router.yaml"):
+        (tmp_path / f).write_text((ROOT / "config" / f).read_text())
+    (tmp_path / "models.yaml").write_text(yaml.safe_dump({"providers": providers, "models": models}))
+    registry = Registry.load(tmp_path)
+    assert registry.providers["lab"].base_url == "https://lab.example/v1"
+    assert registry.providers["lab"].api_key_env == "LAB_API_KEY"
+    assert registry.providers["openai"].base_url == "https://gateway.example/v1"
+    lab = registry.get_model("lab/qwen3-8b")
+    assert lab.provider == "lab" and lab.model == "qwen3-8b" and lab.quality == 7 and lab.strengths == ["chat"]
+    assert registry.get_model(SMALL).speed == 3

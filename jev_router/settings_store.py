@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 
 from sqlalchemy import Boolean, Column, Float, String, Table, Text, delete, insert, select
@@ -41,6 +42,17 @@ custom_models = Table(
 )
 
 
+def _decode(model_id: str, text: str) -> dict | None:
+    try:
+        value = json.loads(text)
+    except (ValueError, TypeError):
+        value = None
+    if not isinstance(value, dict):
+        logging.getLogger("jev_router").warning("settings: saved row for model '%s' is unreadable; skipped", model_id)
+        return None
+    return value
+
+
 class SettingsStore:
     def __init__(self, engine: AsyncEngine):
         self.engine = engine
@@ -56,9 +68,11 @@ class SettingsStore:
                     api_key_enc=r["api_key_enc"], headers_enc=r["headers_enc"],
                 )
             for r in (await conn.execute(select(model_overrides))).mappings():
-                o.model_overrides[r["id"]] = json.loads(r["fields"])
+                if (fields := _decode(r["id"], r["fields"])) is not None:
+                    o.model_overrides[r["id"]] = fields
             for r in (await conn.execute(select(custom_models))).mappings():
-                o.custom_models[r["id"]] = {"provider": r["provider"], **json.loads(r["spec"])}
+                if (spec := _decode(r["id"], r["spec"])) is not None:
+                    o.custom_models[r["id"]] = {"provider": r["provider"], **spec}
         return o
 
     async def save(self, overlay: Overlay) -> None:

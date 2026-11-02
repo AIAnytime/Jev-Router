@@ -434,6 +434,7 @@ const sleep = (t) => new Promise((r) => setTimeout(r, t));
 const STRATEGIES = ["balanced", "quality", "cheapest", "fastest", "privacy"];
 const VIEWS = { overview: "Overview", playground: "Playground", traces: "Traces", models: "Models", settings: "Settings" };
 const PROVIDERS = { liquid: "Liquid", openai: "OpenAI", anthropic: "Anthropic", gemini: "Google Gemini", deepseek: "DeepSeek", groq: "Groq", openrouter: "OpenRouter", ollama: "Ollama (local)" };
+const pname = (n) => Object.hasOwn(PROVIDERS, n) ? PROVIDERS[n] : n;
 const PRESETS = [
   ["Ollama", "ollama", "http://localhost:11434/v1"],
   ["LM Studio", "lmstudio", "http://localhost:1234/v1"],
@@ -881,7 +882,7 @@ async function loadModels() {
     const price = (v) => v ? "$" + v : "free";
     $("#modelsBody").innerHTML = order.map((p) => {
       const list = groups[p], on = list.filter((m) => m.available).length;
-      return `<div class="provider"><div class="provider-h"><h2>${esc(PROVIDERS[p] || p)}</h2><span class="muted small">${on}/${list.length} available</span></div><div class="mgrid">${
+      return `<div class="provider"><div class="provider-h"><h2>${esc(pname(p))}</h2><span class="muted small">${on}/${list.length} available</span></div><div class="mgrid">${
         list.map((m) => `<div class="card mcard ${m.available ? "" : "off"}">
           <div class="row between" style="align-items:flex-start"><span class="mid">${esc(m.id)}</span>${m.available ? `<span class="badge ok">Available</span>` : `<span class="badge">${m.enabled === false || m.requires_key === false ? "Disabled" : "No key"}</span>`}</div>
           <div class="desc">${esc(m.description)}</div>
@@ -986,7 +987,7 @@ async function busy(btn, fn) {
 function guessLocal(url) {
   let host;
   try { host = new URL(url.trim()).hostname.replace(/^\[|\]$/g, ""); } catch { return false; }
-  return host === "localhost" || host === "host.docker.internal" || host === "[::1]" || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+  return host === "localhost" || host === "host.docker.internal" || host === "::1" || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
 }
 function confirmStep(btn, text, action) {
   if (btn.dataset.armed) { action(); return; }
@@ -1036,7 +1037,7 @@ function renderProviders() {
   $("#sProviders").innerHTML = list.map((p) => {
     const [label, cls] = providerStatus(p);
     return `<button class="prow" data-provider="${esc(p.name)}">
-      <span class="prow-main"><span class="row wrap"><b>${esc(PROVIDERS[p.name] || p.name)}</b><span class="badge">${esc(p.type)}</span>${p.source === "custom" ? `<span class="badge violet">custom</span>` : ""}${p.local ? `<span class="badge">local</span>` : ""}</span>
+      <span class="prow-main"><span class="row wrap"><b>${esc(pname(p.name))}</b><span class="badge">${esc(p.type)}</span>${p.source === "custom" ? `<span class="badge violet">custom</span>` : ""}${p.local ? `<span class="badge">local</span>` : ""}</span>
         <span class="mono small muted ellip">${esc(p.base_url)}</span></span>
       <span class="small muted">${esc(keyText(p))}</span>
       <span class="small muted num">${esc(String(p.enabled_models))}/${esc(String(p.model_count))} models</span>
@@ -1122,7 +1123,7 @@ function providerPanel(p) {
   const custom = !p || p.source === "custom";
   const savedKey = p && ["settings", "unreadable"].includes(p.key.source);
   const models = p ? state.sm.filter((m) => m.provider === p.name) : [];
-  return `<div class="dhead"><div style="min-width:0"><div class="eyebrow">${p ? (custom ? "Custom provider" : "Built-in provider") : "Provider"}</div><h2 class="mt-s" style="font:600 20px var(--serif)">${p ? esc(PROVIDERS[p.name] || p.name) : "Add provider"}</h2></div><button class="btn sm" data-close>Close</button></div>
+  return `<div class="dhead"><div style="min-width:0"><div class="eyebrow">${p ? (custom ? "Custom provider" : "Built-in provider") : "Provider"}</div><h2 class="mt-s" style="font:600 20px var(--serif)">${p ? esc(pname(p.name)) : "Add provider"}</h2></div><button class="btn sm" data-close>Close</button></div>
   <div class="dbody">
     ${p ? "" : `<div class="row wrap" id="fPresets">${PRESETS.map(([label], i) => `<button type="button" class="chip" data-preset="${i}">${esc(label)}</button>`).join("")}</div>`}
     <form class="card ${p ? "" : "mt"}" id="fForm" autocomplete="off">
@@ -1247,10 +1248,10 @@ function openProvider(name, openModel = null) {
     $("#fHdrClear", d)?.addEventListener("click", () => saveProvider(p.name, { headers: null }, "Saved headers cleared"));
   }
   $$("[data-preset]", d).forEach((b) => b.onclick = () => {
-    const [, pname, url] = PRESETS[b.dataset.preset];
-    if (pname && state.sp.some((x) => x.name === pname)) { openProvider(pname); return; }
-    $("#fName", d).value = pname; $("#fUrl", d).value = url; $("#fUrl", d).oninput();
-    $(pname ? "#fKey" : "#fName", d).focus();
+    const [, name, url] = PRESETS[b.dataset.preset];
+    if (name && state.sp.some((x) => x.name === name)) { openProvider(name); return; }
+    $("#fName", d).value = name; $("#fUrl", d).value = url; $("#fUrl", d).oninput();
+    $(name ? "#fKey" : "#fName", d).focus();
   });
   $("#fKeyClear", d)?.addEventListener("click", () => saveProvider(p.name, { api_key: null }, "Saved key removed"));
 
