@@ -333,10 +333,10 @@ class ModelRouter:
                         delta = choice.get("delta") or {}
                         out_chars += len(delta.get("content") or "") + len(delta.get("reasoning_content") or "")
                     chunk["model"] = model.id
-                    if is_first:
-                        chunk["jev_router"] = self.public_trace(preview)
-                        is_first = False
                     if chunk.get("choices") or want_usage:
+                        if is_first:
+                            chunk["jev_router"] = self.public_trace(preview)
+                            is_first = False
                         yield f"data: {json.dumps(chunk)}\n\n"
                     chunk = await anext(stream, None)
                 yield "data: [DONE]\n\n"

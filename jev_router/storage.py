@@ -15,6 +15,7 @@ from sqlalchemy import (
     Table,
     Text,
     func,
+    or_,
     select,
     update,
 )
@@ -112,24 +113,49 @@ class TraceStore:
         async with self.engine.begin() as conn:
             await conn.execute(traces.insert().values(**row))
 
+    @staticmethod
+    def _filters(model: str | None, status: str | None, endpoint: str | None, q: str | None) -> list[Any]:
+        conds = []
+        if model:
+            conds.append(traces.c.selected_model == model)
+        if status:
+            conds.append(traces.c.status == status)
+        if endpoint:
+            conds.append(traces.c.endpoint == endpoint)
+        if q:
+            like = f"%{q.lower()}%"
+            conds.append(or_(
+                func.lower(traces.c.prompt_preview).like(like),
+                func.lower(traces.c.selected_model).like(like),
+                func.lower(traces.c.id).like(like),
+            ))
+        return conds
+
     async def list(
         self,
         limit: int = 50,
         offset: int = 0,
         model: str | None = None,
         status: str | None = None,
+        endpoint: str | None = None,
+        q: str | None = None,
     ) -> list[dict[str, Any]]:
-        q = select(*SUMMARY_COLUMNS).order_by(traces.c.created_at.desc()).limit(limit).offset(offset)
-        if model:
-            q = q.where(traces.c.selected_model == model)
-        if status:
-            q = q.where(traces.c.status == status)
+        query = (
+            select(*SUMMARY_COLUMNS)
+            .where(*self._filters(model, status, endpoint, q))
+            .order_by(traces.c.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         async with self.engine.connect() as conn:
-            return [dict(r._mapping) for r in await conn.execute(q)]
+            return [dict(r._mapping) for r in await conn.execute(query)]
 
-    async def count(self) -> int:
+    async def count(
+        self, model: str | None = None, status: str | None = None, endpoint: str | None = None, q: str | None = None
+    ) -> int:
+        query = select(func.count()).select_from(traces).where(*self._filters(model, status, endpoint, q))
         async with self.engine.connect() as conn:
-            return (await conn.execute(select(func.count()).select_from(traces))).scalar_one()
+            return (await conn.execute(query)).scalar_one()
 
     async def get(self, trace_id: str) -> dict[str, Any] | None:
         async with self.engine.connect() as conn:
@@ -202,7 +228,8 @@ class TraceStore:
             if b not in buckets:
                 continue
             buckets[b]["requests"] += 1
-            buckets[b]["cost"] += r["actual_cost"] or 0
+            if r["status"] == "success":
+                buckets[b]["cost"] += r["actual_cost"] or 0
         rated = [r["feedback"] for r in rows if r["feedback"] is not None]
 
         return {

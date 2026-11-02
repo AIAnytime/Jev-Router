@@ -34,12 +34,14 @@ async def list_models(request: Request, _: str = Depends(authenticate)):
         ],
     ]
     for m in registry.models:
+        provider = registry.provider_for(m)
         data.append({
             "id": m.id,
             "object": "model",
             "owned_by": m.provider,
             "available": registry.is_available(m),
-            "requires_key": registry.provider_for(m).requires_key,
+            "requires_key": provider.requires_key,
+            "enable_env": provider.api_key_env if provider.requires_key else provider.enabled_env,
             "upstream_model": m.model,
             "description": m.description,
             "quality": m.quality,
