@@ -135,6 +135,9 @@ def make_client(tmp_path, upstream, provider_env):
             "rate_limit_rpm": 0,
             "decision_cache_ttl": 0,
             "default_strategy": "balanced",
+            "jev_router_admin_key": "",
+            "jev_router_secret": "test-secret",
+            "jev_router_secret_file": str(tmp_path / "secret.key"),
         }
         values.update(overrides)
         client = TestClient(create_app(Settings(**values), transport=upstream.transport))

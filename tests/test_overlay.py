@@ -119,3 +119,27 @@ def test_problems_become_warnings_and_errors(base, box, tmp_path):
     assert len(r.errors) == 1 and "liquid/bad" in r.errors[0]
     assert not {"nope/m", "liquid/bad", "gone/model"} & {m.id for m in r.models}
     assert r.providers["openai"].source == "builtin"
+
+
+def test_bad_saved_data_becomes_warnings_not_crashes(base, box):
+    overlay = Overlay(
+        custom_providers={
+            "lab": CustomProvider(name="lab", base_url="http://localhost:1234/v1", headers_enc=box.encrypt("not json")),
+            "lab2": CustomProvider(name="lab2", base_url="http://localhost:1235/v1", headers_enc=box.encrypt('["x"]')),
+        },
+        model_overrides={
+            "liquid/lfm3-1.7b": {"provider": "ghost", "id": "x/y", "speed": 3.0},
+            "liquid/lfm3-vl-2b": {"provider": "ghost"},
+        },
+        custom_models={"lab/qwen3": {"provider": "lab", "model": "qwen3", "description": "d", "id": "other/id"}},
+    )
+    r = run(base, box, overlay)
+    assert r.errors == []
+    assert r.providers["lab"].headers == {} and r.providers["lab2"].headers == {}
+    assert sum("headers" in w and "unreadable" in w for w in r.warnings) == 2
+    small = next(m for m in r.models if m.id == "liquid/lfm3-1.7b")
+    assert small.provider == "liquid" and small.speed == 3.0
+    assert next(m for m in r.models if m.id == "liquid/lfm3-vl-2b").provider == "liquid"
+    assert "settings for model 'liquid/lfm3-1.7b' ignored fields: id, provider" in r.warnings
+    assert "settings for model 'liquid/lfm3-vl-2b' ignored fields: provider" in r.warnings
+    assert "lab/qwen3" in {m.id for m in r.models} and "other/id" not in {m.id for m in r.models}

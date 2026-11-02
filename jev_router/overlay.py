@@ -65,6 +65,19 @@ def _open(box: SecretBox, token: str | None, what: str, warnings: list[str]) -> 
     return value, False
 
 
+def _headers(raw: str | None, name: str, warnings: list[str]) -> dict[str, Any]:
+    if not raw:
+        return {}
+    try:
+        headers = json.loads(raw)
+    except ValueError:
+        headers = None
+    if not isinstance(headers, dict):
+        warnings.append(f"saved headers for provider '{name}' are unreadable; ignoring them")
+        return {}
+    return headers
+
+
 def merge(
     base_providers: dict[str, ProviderSpec],
     base_models: list[ModelSpec],
@@ -91,11 +104,11 @@ def merge(
             continue
         key, unreadable = _open(box, c.api_key_enc, f"saved key for provider '{name}'", warnings)
         raw_headers, _ = _open(box, c.headers_enc, f"saved headers for provider '{name}'", warnings)
+        headers = _headers(raw_headers, name, warnings)
         try:
             providers[name] = ProviderSpec(
                 name=name, type=c.type, base_url=c.base_url, requires_key=False, local=c.local, source="custom",
-                enabled_override=c.enabled, stored_key=key, stored_key_unreadable=unreadable,
-                headers=json.loads(raw_headers) if raw_headers else {},
+                enabled_override=c.enabled, stored_key=key, stored_key_unreadable=unreadable, headers=headers,
             )
         except ValidationError as e:
             errors.append(f"provider '{name}': {_first_error(e)}")
@@ -103,7 +116,11 @@ def merge(
     models: list[ModelSpec] = []
     base_ids = {m.id for m in base_models}
     for m in base_models:
-        fields = overlay.model_overrides.get(m.id)
+        fields = overlay.model_overrides.get(m.id) or {}
+        bad = fields.keys() - set(EDITABLE_MODEL_FIELDS)
+        if bad:
+            warnings.append(f"settings for model '{m.id}' ignored fields: {', '.join(sorted(bad))}")
+            fields = {k: v for k, v in fields.items() if k not in bad}
         if not fields:
             models.append(m.model_copy(deep=True))
             continue
@@ -122,7 +139,7 @@ def merge(
             warnings.append(f"custom model '{mid}' skipped: provider '{spec.get('provider')}' is missing")
             continue
         try:
-            models.append(ModelSpec(id=mid, **spec))
+            models.append(ModelSpec(**{**spec, "id": mid}))
         except ValidationError as e:
             errors.append(f"model '{mid}': {_first_error(e)}")
 

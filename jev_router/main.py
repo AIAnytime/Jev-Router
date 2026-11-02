@@ -13,6 +13,7 @@ from . import __version__
 from .api import chat, observability, routing
 from .api.deps import APIError, RateLimiter, error_response
 from .config import Settings, get_settings
+from .crypto import SecretBox
 from .engine.cache import TTLCache
 from .engine.decision import DecisionEngine
 from .engine.jev_client import JevClient
@@ -22,7 +23,9 @@ from .registry import Registry
 from .services.executor import Executor
 from .services.guardrails import Guardrails
 from .services.model_router import ModelRouter, RoutingError
+from .services.settings_service import SettingsService
 from .services.task_routers import AgentRouter, ToolRouter
+from .settings_store import SettingsStore
 from .storage import TraceStore
 
 DASHBOARD = Path(__file__).parent / "dashboard" / "index.html"
@@ -44,11 +47,17 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         store = TraceStore(settings.database_url)
         await store.init()
         decision = DecisionEngine(jev, TTLCache(settings.decision_cache_size, settings.decision_cache_ttl))
+        box = SecretBox.from_settings(settings.jev_router_secret, settings.jev_router_secret_file)
+        settings_service = SettingsService(registry, SettingsStore(store.engine), box, decision.cache)
+        await settings_service.load()
+        for warning in settings_service.warnings:
+            log.warning("settings: %s", warning)
         guardrails = Guardrails(registry.router.guardrails)
 
         s = app.state
         s.settings, s.registry, s.jev, s.store, s.decision, s.guardrails = settings, registry, jev, store, decision, guardrails
         s.limiter = RateLimiter(settings.rate_limit_rpm)
+        s.http, s.settings_service = http, settings_service
         s.model_router = ModelRouter(
             settings, registry, decision, PolicyEngine(registry.router, settings.confidence_threshold),
             Executor(registry, build_providers(http)), store, guardrails,
