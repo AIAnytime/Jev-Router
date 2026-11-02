@@ -154,6 +154,7 @@ class Registry:
 
     def apply(self, providers: dict[str, ProviderSpec], models: list[ModelSpec]) -> None:
         self.validate(providers, models)
+        # Always rebind to the new objects, never mutate in place: in-flight requests hold the old dict.
         self.providers = providers
         self.models = models
 

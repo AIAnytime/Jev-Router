@@ -20,6 +20,7 @@ class FakeUpstream:
     def __init__(self):
         self.jev_calls: list[dict[str, Any]] = []
         self.chat_calls: list[dict[str, Any]] = []
+        self.chat_urls: list[str] = []
         self.anthropic_calls: list[dict[str, Any]] = []
         self.route_choice: str | None = None
         self.route_confidence = 0.9
@@ -98,6 +99,7 @@ class FakeUpstream:
         if request.url.host == "api.typesafe.ai":
             return self._jev(body)
         if request.url.path.endswith("/chat/completions"):
+            self.chat_urls.append(str(request.url))
             return self._chat(body)
         if request.url.path.endswith("/messages"):
             return self._anthropic(body)

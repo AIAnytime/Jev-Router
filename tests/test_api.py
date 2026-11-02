@@ -139,6 +139,45 @@ def test_fallbacks_can_be_disabled(client, upstream):
     assert trace["status"] == "error"
 
 
+def test_in_flight_request_keeps_the_provider_it_planned_with(client, upstream, monkeypatch):
+    from jev_router.registry import ModelSpec, ProviderSpec
+
+    registry, decision = client.app.state.registry, client.app.state.decision
+    lab = ProviderSpec(name="lab", base_url="http://lab-old/v1", requires_key=False, source="custom")
+    model = ModelSpec(id="lab/m", provider="lab", model="m", description="m")
+    with_lab = ({**registry.base_providers, "lab": lab}, [*registry.base_models, model])
+    swaps = []
+    decide = decision.decide
+
+    async def decide_then_swap(*args, **kwargs):
+        signals = await decide(*args, **kwargs)
+        registry.apply(*swaps.pop(0))
+        return signals
+
+    monkeypatch.setattr(decision, "decide", decide_then_swap)
+
+    # Provider removed after planning: the completion still finishes on the old spec.
+    registry.apply(*with_lab)
+    swaps.append((registry.base_providers, registry.base_models))
+    r = chat(client, model="lab/m")
+    assert r.status_code == 200
+    assert r.json()["jev_router"]["provider"] == "lab"
+    assert upstream.chat_urls[-1] == "http://lab-old/v1/chat/completions"
+
+    # Provider edited after planning: the stream keeps the old base_url.
+    registry.apply(*with_lab)
+    moved = lab.model_copy(update={"base_url": "http://lab-new/v1"})
+    swaps.append(({**registry.base_providers, "lab": moved}, with_lab[1]))
+    with client.stream("POST", "/v1/chat/completions",
+                       json={"model": "lab/m", "stream": True, "messages": [{"role": "user", "content": "hi"}]}) as r:
+        assert r.status_code == 200
+        lines = [line for line in r.iter_lines() if line.startswith("data: ")]
+    assert lines[-1] == "data: [DONE]"
+    assert upstream.chat_urls[-1] == "http://lab-old/v1/chat/completions"
+    trace = wait_for_trace(client, r.headers["X-Jev-Router-Trace-Id"])
+    assert trace["status"] == "success" and trace["provider"] == "lab"
+
+
 def test_jev_outage_degrades_to_heuristic(client, upstream):
     upstream.jev_fail = True
     r = chat(client, "hello")
