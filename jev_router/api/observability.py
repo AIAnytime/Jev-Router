@@ -30,10 +30,13 @@ async def list_traces(
     offset: int = Query(0, ge=0),
     model: str | None = None,
     status: str | None = None,
+    endpoint: str | None = None,
+    q: str | None = Query(None, max_length=200),
     _: str = Depends(authenticate),
 ):
     store = request.app.state.store
-    return {"data": await store.list(limit, offset, model, status), "total": await store.count()}
+    filters = {"model": model, "status": status, "endpoint": endpoint, "q": q}
+    return {"data": await store.list(limit, offset, **filters), "total": await store.count(**filters)}
 
 
 @router.get("/v1/traces/{trace_id}")

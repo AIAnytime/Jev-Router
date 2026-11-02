@@ -273,10 +273,10 @@ On chat, `"guardrails": true` (or `always_on: true` in config) runs these checks
 
 Open `http://localhost:8000/`. It has four pages:
 
-- **Overview.** Requests, success rate, spend, savings vs. the strongest model, latency, decision time, model mix, task types, complexity and strategies.
-- **Playground.** Send a prompt (or route only) and inspect the decision, Jev probabilities, ranking and filtered-out models.
-- **Traces.** Every decision, newest first, with a detail drawer. Mark routes good, neutral or bad to build a feedback dataset.
-- **Models.** The registry and which models your keys enable.
+- **Overview.** Requests, success rate, spend, savings vs. the strongest model, latency, decision time, model mix, task types, complexity and strategies. Refreshes every 30 seconds.
+- **Playground.** Send a prompt (or route only), watch the answer stream in, and see why Jev picked the model: probabilities, ranking, score parts and filtered-out models.
+- **Traces.** Every decision, newest first, with search and endpoint/status filters, and a detail drawer. Mark routes good, neutral or bad to build a feedback dataset.
+- **Models.** The registry grouped by provider, with the env var that enables each one.
 
 | Playground | Trace detail |
 | --- | --- |
@@ -380,6 +380,8 @@ evals/         routing eval dataset
 ## License
 
 [MIT](LICENSE)
+
+Built by [AI Anytime](https://aianytime.net).
 
 ---
 

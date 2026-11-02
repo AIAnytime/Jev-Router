@@ -38,6 +38,10 @@ def test_health_and_models(client):
     assert {"auto", "auto:cheapest", "auto:privacy"} <= set(ids)
     assert ids[SMALL]["available"] and not ids["openai/gpt-5"]["available"]
     assert ids["ollama/llama3.2"]["requires_key"] is False
+    assert ids["openai/gpt-5"]["enable_env"] == "OPENAI_API_KEY"
+    assert ids["ollama/llama3.2"]["enable_env"] == "OLLAMA_ENABLED"
+    r = client.get("/")
+    assert "Built by AI Anytime" in r.text and "https://aianytime.net" in r.text
 
 
 def test_dashboard_is_served(client):
@@ -311,6 +315,12 @@ def test_traces_feedback_and_analytics(client, upstream):
     assert listing["total"] == 5
     assert listing["data"][0]["endpoint"] == "route_model"
     assert len(client.get(f"/v1/traces?model={SMALL}").json()["data"]) == 3
+
+    routed = client.get("/v1/traces?endpoint=route_model").json()
+    assert routed["total"] == 1 and [t["endpoint"] for t in routed["data"]] == ["route_model"]
+    found = client.get("/v1/traces?q=hello 1").json()
+    assert found["total"] == 1 and found["data"][0]["prompt_preview"] == "hello 1"
+    assert client.get("/v1/traces?endpoint=chat&q=HARD").json()["total"] == 1
 
     r = client.post(f"/v1/traces/{ids[0]}/feedback", json={"score": -1, "comment": "too weak"})
     assert r.status_code == 200
