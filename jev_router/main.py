@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
-from .api import chat, observability, routing
+from .api import chat, observability, routing, settings as settings_api
 from .api.deps import APIError, RateLimiter, error_response
 from .config import Settings, get_settings
 from .crypto import SecretBox
@@ -119,6 +119,7 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
     app.include_router(chat.router)
     app.include_router(routing.router)
     app.include_router(observability.router)
+    app.include_router(settings_api.router)
 
     @app.get("/", include_in_schema=False)
     async def dashboard():

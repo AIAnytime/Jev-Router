@@ -20,7 +20,6 @@ class FakeUpstream:
     def __init__(self):
         self.jev_calls: list[dict[str, Any]] = []
         self.chat_calls: list[dict[str, Any]] = []
-        self.chat_urls: list[str] = []
         self.anthropic_calls: list[dict[str, Any]] = []
         self.route_choice: str | None = None
         self.route_confidence = 0.9
@@ -32,6 +31,8 @@ class FakeUpstream:
         self.jev_fail = False
         self.fail_models: set[str] = set()
         self.reply = "Hello from the mock model."
+        self.listed: dict[str, dict[str, Any]] = {}
+        self.chat_requests: list[httpx.Request] = []
 
     # -- Jev ---------------------------------------------------------------
     def _jev(self, body: dict[str, Any]) -> httpx.Response:
@@ -94,12 +95,26 @@ class FakeUpstream:
             "usage": {"input_tokens": 12, "output_tokens": 4},
         })
 
+    def _list(self, request: httpx.Request) -> httpx.Response:
+        spec = self.listed.get(request.url.host)
+        if spec is None:
+            return httpx.Response(404, text="not found")
+        if "status" in spec:
+            return httpx.Response(spec["status"], text=spec.get("message", ""))
+        if request.url.path.endswith("/api/tags") and "tags" in spec:
+            return httpx.Response(200, json={"models": [{"name": n} for n in spec["tags"]]})
+        if request.url.path.endswith("/models") and "models" in spec:
+            return httpx.Response(200, json={"object": "list", "data": [{"id": n} for n in spec["models"]]})
+        return httpx.Response(404, text="not found")
+
     def handler(self, request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return self._list(request)
         body = json.loads(request.content or b"{}")
         if request.url.host == "api.typesafe.ai":
             return self._jev(body)
         if request.url.path.endswith("/chat/completions"):
-            self.chat_urls.append(str(request.url))
+            self.chat_requests.append(request)
             return self._chat(body)
         if request.url.path.endswith("/messages"):
             return self._anthropic(body)
@@ -126,7 +141,7 @@ def provider_env(monkeypatch):
 def make_client(tmp_path, upstream, provider_env):
     clients: list[TestClient] = []
 
-    def factory(**overrides: Any) -> TestClient:
+    def factory(client_host: str = "testclient", **overrides: Any) -> TestClient:
         values: dict[str, Any] = {
             "jev_api_key": "test-jev",
             "jev_router_api_keys": "",
@@ -140,7 +155,7 @@ def make_client(tmp_path, upstream, provider_env):
             "jev_router_secret_file": str(tmp_path / "secret.key"),
         }
         values.update(overrides)
-        client = TestClient(create_app(Settings(**values), transport=upstream.transport))
+        client = TestClient(create_app(Settings(**values), transport=upstream.transport), client=(client_host, 50000))
         client.__enter__()
         clients.append(client)
         return client

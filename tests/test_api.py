@@ -162,7 +162,7 @@ def test_in_flight_request_keeps_the_provider_it_planned_with(client, upstream, 
     r = chat(client, model="lab/m")
     assert r.status_code == 200
     assert r.json()["jev_router"]["provider"] == "lab"
-    assert upstream.chat_urls[-1] == "http://lab-old/v1/chat/completions"
+    assert str(upstream.chat_requests[-1].url) == "http://lab-old/v1/chat/completions"
 
     # Provider edited after planning: the stream keeps the old base_url.
     registry.apply(*with_lab)
@@ -173,7 +173,7 @@ def test_in_flight_request_keeps_the_provider_it_planned_with(client, upstream, 
         assert r.status_code == 200
         lines = [line for line in r.iter_lines() if line.startswith("data: ")]
     assert lines[-1] == "data: [DONE]"
-    assert upstream.chat_urls[-1] == "http://lab-old/v1/chat/completions"
+    assert str(upstream.chat_requests[-1].url) == "http://lab-old/v1/chat/completions"
     trace = wait_for_trace(client, r.headers["X-Jev-Router-Trace-Id"])
     assert trace["status"] == "success" and trace["provider"] == "lab"
 
