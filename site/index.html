@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jev Router · The right model for every prompt</title>
+  <meta name="description" content="Jev Router is an open-source, OpenAI-compatible LLM router. Send model: &quot;auto&quot; and Jev picks the right-sized model for each request, then tells you why.">
+  <meta name="theme-color" content="#f6f4ee">
+  <link rel="canonical" href="https://jevrouter.aianytime.net/">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Jev Router">
+  <meta property="og:url" content="https://jevrouter.aianytime.net/">
+  <meta property="og:title" content="Jev Router · The right model for every prompt">
+  <meta property="og:description" content="Open-source, OpenAI-compatible LLM router. 100% right-sized model picks and 35.6% cheaper than always using the strongest model.">
+  <meta property="og:image" content="https://jevrouter.aianytime.net/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Jev Router · The right model for every prompt">
+  <meta name="twitter:description" content="Open-source, OpenAI-compatible LLM router powered by Jev decisions.">
+  <meta name="twitter:image" content="https://jevrouter.aianytime.net/assets/og.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="top">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="Jev Router home">
+        <svg class="logo" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#1f1f1f"/><path d="M9 23l5.2-14h3.6L23 23" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="18.4" r="2.1" fill="#d4f75e"/></svg>
+        <span>Jev Router</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#results">Results</a>
+        <a href="#quickstart">Quickstart</a>
+      </nav>
+      <a class="btn btn-ink btn-sm" href="https://github.com/AIAnytime/Jev-Router" target="_blank" rel="noopener" aria-label="Star Jev Router on GitHub">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>Star on GitHub</span>
+      </a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <a class="eyebrow" href="https://typesafe.ai" target="_blank" rel="noopener">
+            <span class="dot" aria-hidden="true"></span>
+            Open source · Powered by Jev from TypeSafe
+          </a>
+          <h1>The right model for <em>every</em> prompt.</h1>
+          <p class="lede">Jev Router is one OpenAI-compatible endpoint for all your LLMs. Send <code>model: "auto"</code> and Jev picks the right-sized model for each request, then tells you why.</p>
+          <div class="cta-row">
+            <a class="btn btn-lime" href="#quickstart">Get started <span aria-hidden="true">→</span></a>
+            <a class="btn btn-ghost" href="https://github.com/AIAnytime/Jev-Router" target="_blank" rel="noopener">View on GitHub</a>
+          </div>
+          <p class="hero-note">Self-hosted · MIT licensed · Your keys stay on your server</p>
+        </div>
+
+        <div class="demo" aria-label="Routing demo">
+          <div class="console" id="console">
+            <div class="console-bar">
+              <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="mono">POST /v1/chat/completions</span>
+              <span class="mono pill">model: auto</span>
+            </div>
+
+            <div class="console-body">
+              <div class="row-label">Prompt</div>
+              <div class="prompt mono" id="dPrompt" aria-live="polite"></div>
+
+              <div class="row-label">Jev decision</div>
+              <div class="signals" id="dSignals"></div>
+
+              <div class="row-label" id="dRankLabel">Ranking</div>
+              <ol class="ranking" id="dRanking"></ol>
+
+              <div class="verdict" id="dVerdict"></div>
+            </div>
+          </div>
+
+          <div class="demo-tabs" role="tablist" aria-label="Example prompts" id="dTabs"></div>
+          <p class="demo-note">Illustrative routing. Try your own prompts in the built-in Playground.</p>
+        </div>
+      </div>
+
+      <div class="wrap">
+        <dl class="stats">
+          <div><dt>100%</dt><dd>right-sized model picks in the 30-prompt eval</dd></div>
+          <div><dt>35.6%</dt><dd>cheaper than always using the strongest model</dd></div>
+          <div><dt>295 ms</dt><dd>median routing decision</dd></div>
+          <div><dt>0</dt><dd>hard prompts sent to a weak model</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="providers" aria-label="Supported providers">
+      <div class="wrap">
+        <p class="providers-title">Routes across the providers you already use</p>
+        <ul class="provider-list">
+          <li>Liquid AI</li><li>OpenAI</li><li>Anthropic</li><li>Google Gemini</li>
+          <li>DeepSeek</li><li>Groq</li><li>OpenRouter</li><li>Ollama</li>
+          <li>LM Studio</li><li>vLLM</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="code">
+      <div class="wrap split">
+        <div class="reveal">
+          <p class="kicker">Drop-in</p>
+          <h2>Change one line. Keep your code.</h2>
+          <p class="body">Point any OpenAI SDK at Jev Router and set the model to <code>auto</code>. Streaming, tools and JSON mode work as before. Every response says which model answered and why it was picked.</p>
+          <ul class="checks">
+            <li>Works with the OpenAI SDKs, LangChain, LlamaIndex, the Vercel AI SDK and curl</li>
+            <li>Choose a strategy per request: <code>balanced</code>, <code>quality</code>, <code>cheapest</code>, <code>fastest</code> or <code>privacy</code></li>
+            <li>The decision also comes back as <code>X-Jev-Router-*</code> headers, so it works for streams too</li>
+          </ul>
+        </div>
+
+        <div class="code-card reveal">
+          <div class="code-tabs" role="tablist" aria-label="Code language">
+            <button role="tab" aria-selected="true" data-tab="py">Python</button>
+            <button role="tab" aria-selected="false" data-tab="ts">TypeScript</button>
+            <button role="tab" aria-selected="false" data-tab="sh">curl</button>
+            <button class="copy" data-copy-from="active" aria-label="Copy code">Copy</button>
+          </div>
+<pre class="code" data-panel="py"><code><span class="k">from</span> openai <span class="k">import</span> OpenAI
+
+client = OpenAI(
+    base_url=<span class="s">"http://localhost:8000/v1"</span>,
+    api_key=<span class="s">"your-router-key"</span>,
+)
+
+resp = client.chat.completions.create(
+    model=<span class="hl">"auto"</span>,  <span class="c"># let Jev decide</span>
+    messages=[{<span class="s">"role"</span>: <span class="s">"user"</span>, <span class="s">"content"</span>: <span class="s">"Refactor this to be async..."</span>}],
+)
+
+print(resp.model)
+<span class="c"># liquid/lfm2.5-24b-a2b</span>
+print(resp.model_extra[<span class="s">"jev_router"</span>][<span class="s">"routing_reason"</span>])
+<span class="c"># coding request, complex complexity; balanced strategy chose ...</span></code></pre>
+<pre class="code" data-panel="ts" hidden><code><span class="k">import</span> OpenAI <span class="k">from</span> <span class="s">"openai"</span>;
+
+<span class="k">const</span> client = <span class="k">new</span> OpenAI({
+  baseURL: <span class="s">"http://localhost:8000/v1"</span>,
+  apiKey: <span class="s">"your-router-key"</span>,
+});
+
+<span class="k">const</span> resp = <span class="k">await</span> client.chat.completions.create({
+  model: <span class="hl">"auto"</span>, <span class="c">// let Jev decide</span>
+  messages: [{ role: <span class="s">"user"</span>, content: <span class="s">"Refactor this to be async..."</span> }],
+});
+
+console.log(resp.model);
+<span class="c">// liquid/lfm2.5-24b-a2b</span></code></pre>
+<pre class="code" data-panel="sh" hidden><code>curl http://localhost:8000/v1/chat/completions \
+  -H <span class="s">"Authorization: Bearer $ROUTER_KEY"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -H <span class="s">"x-jev-strategy: cheapest"</span> \
+  -d <span class="s">'{
+    "model": "auto",
+    "messages": [{"role": "user", "content": "Summarise this email"}]
+  }'</span>
+
+<span class="c"># X-Jev-Router-Model: liquid/lfm3-1.7b</span>
+<span class="c"># X-Jev-Router-Strategy: cheapest</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tint" id="how">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="kicker">How it works</p>
+          <h2>Hard rules first. Then one Jev call decides.</h2>
+          <p class="body">Most routers use keyword rules, embeddings or an extra LLM call that returns prose. Jev Router asks Jev a set of typed questions and gets back real probabilities it can rank models with.</p>
+        </div>
+
+        <figure class="shot arch reveal">
+          <a href="assets/architecture.png" target="_blank" rel="noopener" aria-label="Open the architecture diagram at full size">
+            <img src="assets/architecture.png" width="3360" height="1722" alt="Jev Router architecture: clients (your app, the dashboard, the CLI) call one OpenAI-compatible FastAPI service. Each request runs a six-step pipeline (extract features, hard filters, one Jev decision, rank, execute with fallbacks, trace) backed by the model registry, Settings and storage, then goes to hosted, local or custom model providers." loading="lazy" decoding="async">
+          </a>
+          <figcaption>Select the diagram to open it full size</figcaption>
+        </figure>
+
+        <ol class="steps">
+          <li class="reveal"><span class="num">01</span><h3>Extract</h3><p>Read the prompt, history, token count, images, audio, tools and JSON mode.</p></li>
+          <li class="reveal"><span class="num">02</span><h3>Filter</h3><p>Drop every model that can't serve the request: context, modality, privacy, budget. Record why.</p></li>
+          <li class="reveal"><span class="num">03</span><h3>Decide</h3><p>One Jev call with typed questions: which model fits, how hard is it, does it need a frontier model.</p></li>
+          <li class="reveal"><span class="num">04</span><h3>Rank</h3><p>Score each model on fit, capability, quality, cost and latency, weighted by your strategy.</p></li>
+          <li class="reveal"><span class="num">05</span><h3>Execute</h3><p>Call the top model. If it fails or times out, the next capable model takes over.</p></li>
+          <li class="reveal"><span class="num">06</span><h3>Trace</h3><p>Store the decision, ranking, attempts, tokens, cost and latency for every request.</p></li>
+        </ol>
+
+        <div class="questions reveal">
+          <div class="q"><span class="mono tag">choice</span><span>Which eligible model fits this request?</span></div>
+          <div class="q"><span class="mono tag">score 0–3</span><span>How technically demanding is it?</span></div>
+          <div class="q"><span class="mono tag">noul</span><span>Does it genuinely need a frontier model?</span></div>
+          <div class="q"><span class="mono tag">noul</span><span>Is it harmful, an injection or PII?</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="kicker">Features</p>
+          <h2>Everything a router needs. Nothing you have to babysit.</h2>
+        </div>
+
+        <div class="grid">
+          <article class="card reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h6l4 6-4 6H4M14 12h6"/></svg>
+            <h3>Four routers in one</h3>
+            <p>Route to models, agents and tools, and screen requests with guardrails, all from the same engine.</p>
+          </article>
+          <article class="card reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h4V9H4zM10 18h4V5h-4zM16 18h4v-6h-4z"/></svg>
+            <h3>Five strategies</h3>
+            <p><code>balanced</code>, <code>quality</code>, <code>cheapest</code>, <code>fastest</code> and <code>privacy</code>. Pick one per request with a header or body field.</p>
+          </article>
+          <article class="card reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"/></svg>
+            <h3>Automatic fallbacks</h3>
+            <p>If the chosen model errors or times out, the next-ranked capable model answers. Every attempt shows in the trace.</p>
+          </article>
+          <article class="card reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+            <h3>Guardrails</h3>
+            <p>Block prompt injection, harmful content and PII before a request reaches any model, with a confidence score for each check.</p>
+          </article>
+          <article class="card reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+            <h3>Never a single point of failure</h3>
+            <p>If Jev is slow or down, a local heuristic router takes over and the trace says so.</p>
+          </article>
+          <article class="card reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h3M8 17h6"/></svg>
+            <h3>Built-in dashboard</h3>
+            <p>Spend, savings, latency and model mix, plus a playground and a trace explorer for every decision.</p>
+          </article>
+          <article class="card reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>
+            <h3>Bring your own keys</h3>
+            <p>Add provider keys and OpenAI-compatible servers in Settings. Keys are encrypted at rest and never sent to clients.</p>
+          </article>
+          <article class="card reveal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+            <h3>Local models too</h3>
+            <p>Connect Ollama, LM Studio or vLLM. The <code>privacy</code> strategy keeps requests on local models only.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tint" id="dashboard">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="kicker">Observability</p>
+          <h2>See every decision, not just the bill.</h2>
+          <p class="body">Each request gets a trace: the model Jev picked, the ranking, the reason, every fallback attempt, tokens, cost and what it would have cost on your strongest model.</p>
+        </div>
+        <figure class="shot reveal">
+          <img src="assets/dashboard-trace.png" width="1440" height="900" alt="Jev Router trace view showing the selected model, why it was picked, strategy, complexity, cost, latency and the model ranking" loading="lazy" decoding="async">
+        </figure>
+      </div>
+    </section>
+
+    <section class="section section-night" id="results">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="kicker">Results</p>
+          <h2>Measured, not claimed.</h2>
+          <p class="body">The repo ships a 30-prompt routing eval: 15 light and 15 heavy prompts across chat, coding, math, analysis, extraction and writing. Here is a live run with the Liquid models and the <code>balanced</code> strategy.</p>
+        </div>
+
+        <div class="table-wrap reveal">
+          <table class="results">
+            <thead>
+              <tr><th scope="col">Metric</th><th scope="col">Jev Router</th><th scope="col">Heuristic router</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Right-sized model (tier accuracy)</th><td class="win">100%</td><td>53.3%</td></tr>
+              <tr><th scope="row">Task-type accuracy</th><td class="win">83.3%</td><td>46.7%</td></tr>
+              <tr><th scope="row">Hard prompts sent to a weak model</th><td class="win">0</td><td>14 of 15</td></tr>
+              <tr><th scope="row">Cost saved vs. always using the strongest model</th><td class="win">35.6%</td><td>68.7%*</td></tr>
+              <tr><th scope="row">Decision latency p50 / p95</th><td>295 / 409 ms</td><td>&lt;1 ms</td></tr>
+            </tbody>
+          </table>
+          <p class="footnote">* The heuristic only looks cheaper because it sends 14 of the 15 hard prompts to a model that's too weak for them.</p>
+        </div>
+
+        <div class="eval-cmd reveal">
+          <span class="mono">$ jev-router eval</span>
+          <span class="muted">Run it against your own keys and prompts.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="quickstart">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="kicker">Quickstart</p>
+          <h2>Running in about two minutes.</h2>
+          <p class="body">Python 3.11+ or Docker. You need a Jev API key and at least one provider key, or a local Ollama.</p>
+        </div>
+
+        <div class="qs">
+          <div class="qs-step reveal">
+            <div class="qs-head"><span class="num">1</span><h3>Install</h3></div>
+            <div class="cmd"><pre><code>git clone https://github.com/AIAnytime/Jev-Router.git
+cd Jev-Router
+uv venv &amp;&amp; uv pip install -e ".[dev]"</code></pre><button class="copy" aria-label="Copy install commands">Copy</button></div>
+          </div>
+          <div class="qs-step reveal">
+            <div class="qs-head"><span class="num">2</span><h3>Configure</h3></div>
+            <div class="cmd"><pre><code>cp .env.example .env
+# JEV_API_KEY=...
+# LIQUID_API_KEY=...   any provider key works</code></pre><button class="copy" aria-label="Copy configure commands">Copy</button></div>
+          </div>
+          <div class="qs-step reveal">
+            <div class="qs-head"><span class="num">3</span><h3>Run</h3></div>
+            <div class="cmd"><pre><code>jev-router serve
+# API + dashboard on http://localhost:8000</code></pre><button class="copy" aria-label="Copy run command">Copy</button></div>
+          </div>
+        </div>
+
+        <div class="docker reveal">
+          <span>Prefer Docker?</span>
+          <div class="cmd cmd-inline"><pre><code>docker compose up -d --build</code></pre><button class="copy" aria-label="Copy Docker command">Copy</button></div>
+          <a class="link" href="https://github.com/AIAnytime/Jev-Router#quickstart" target="_blank" rel="noopener">Full setup guide →</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="wrap final-inner reveal">
+        <h2>Stop picking models by hand.</h2>
+        <p>Let Jev make the call on every request, and see exactly why it chose.</p>
+        <div class="cta-row">
+          <a class="btn btn-lime" href="https://github.com/AIAnytime/Jev-Router" target="_blank" rel="noopener">Star on GitHub</a>
+          <a class="btn btn-ghost-dark" href="#quickstart">Read the quickstart</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="footer-brand">
+        <p class="brand">
+          <svg class="logo" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#1f1f1f"/><path d="M9 23l5.2-14h3.6L23 23" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="18.4" r="2.1" fill="#d4f75e"/></svg>
+          <span>Built by <a class="built-link" href="https://aianytime.net" target="_blank" rel="noopener">AI Anytime</a> with <span class="heart" role="img" aria-label="love">❤️</span></span>
+        </p>
+        <p class="muted">Open-source LLM routing, powered by <a href="https://typesafe.ai" target="_blank" rel="noopener">Jev</a>.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="https://github.com/AIAnytime/Jev-Router" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/AIAnytime/Jev-Router#readme" target="_blank" rel="noopener">Docs</a>
+        <a href="https://github.com/AIAnytime/Jev-Router/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+        <a href="https://aianytime.net" target="_blank" rel="noopener">aianytime.net</a>
+      </nav>
+      <p class="copyright muted">© <span id="year">2026</span> AI Anytime</p>
+    </div>
+  </footer>
+</body>
+</html>
