@@ -58,21 +58,7 @@ Those signals feed a transparent policy engine, so every decision is **typed, ex
 
 ## How it works
 
-```mermaid
-flowchart LR
-    C[Client<br/>OpenAI SDK] -->|POST /v1/chat/completions| F[Feature extraction<br/>tokens, modalities, tools]
-    F --> H[Hard filters<br/>context, modality, tools,<br/>privacy, budget, allow/deny]
-    H -->|eligible models| J{{Jev<br/>one typed decision call}}
-    J -->|fit, complexity,<br/>premium, task type| P[Policy engine<br/>strategy weights]
-    P -->|ranked plan| E[Executor<br/>fallback chain]
-    E --> M1[(Liquid)]
-    E --> M2[(OpenAI / Anthropic /<br/>Gemini / ...)]
-    E --> M3[(Ollama, local)]
-    E --> T[Trace store<br/>SQLite / Postgres]
-    T --> D[Dashboard + analytics]
-    J -. unavailable .-> X[Heuristic fallback]
-    X --> P
-```
+![Jev Router architecture](docs/assets/architecture.png)
 
 1. **Extract features.** Prompt, system prompt, history, estimated tokens, images/audio, tools and JSON mode.
 2. **Filter.** Drop every model that cannot serve the request, and record why.
