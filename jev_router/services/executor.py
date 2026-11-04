@@ -24,6 +24,18 @@ class AllProvidersFailed(Exception):
         super().__init__(f"all {len(attempts)} provider attempt(s) failed; last: {last.error if last else 'n/a'}")
 
 
+def client_status(upstream: int | None) -> int:
+    """Map the last upstream status to the status the router returns to its own client.
+
+    Upstream 401/403/404 mean the router's provider credentials or model ids are wrong, not the caller's,
+    so they become 502 instead of making the OpenAI SDK report a bad router key. Request-shape errors
+    (400/413/422), rate limits (429) and gateway errors (502/503/504) keep their meaning and pass through.
+    """
+    if upstream in (400, 413, 422, 429, 502, 503, 504):
+        return upstream
+    return 502
+
+
 def attempts_dict(attempts: list[Attempt]) -> list[dict[str, Any]]:
     return [asdict(a) for a in attempts]
 
@@ -72,6 +84,9 @@ class Executor:
                 attempts.append(Attempt(model.id, spec.name, "error", _ms(start), e.status, e.message))
                 await stream.aclose()
                 continue
+            except BaseException:
+                await stream.aclose()
+                raise
             attempts.append(Attempt(model.id, spec.name, "success", _ms(start), 200))
             return model, first, stream, attempts
         raise AllProvidersFailed(attempts)

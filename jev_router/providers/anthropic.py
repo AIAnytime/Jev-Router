@@ -152,7 +152,13 @@ class AnthropicProvider(Provider):
         except (httpx.HTTPError, httpx.InvalidURL, OSError, OverflowError, ExceptionGroup) as e:
             raise ProviderError(503, f"anthropic unreachable: {e.__class__.__name__}") from e
         await raise_for_status(resp)
-        return from_anthropic(resp.json(), model.model)
+        try:
+            data = resp.json()
+        except ValueError as e:
+            raise ProviderError(502, f"{spec.name} returned invalid JSON") from e
+        if not isinstance(data, dict):
+            raise ProviderError(502, f"{spec.name} returned an unexpected response body")
+        return from_anthropic(data, model.model)
 
     async def stream(
         self, spec: ProviderSpec, model: ModelSpec, payload: dict[str, Any]

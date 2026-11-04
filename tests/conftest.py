@@ -29,7 +29,9 @@ class FakeUpstream:
         self.guard: dict[str, float] = {}
         self.choices: dict[str, str] = {}
         self.jev_fail = False
+        self.jev_raw: httpx.Response | None = None  # when set, Jev returns exactly this
         self.fail_models: set[str] = set()
+        self.fail_status = 503
         self.reply = "Hello from the mock model."
         self.listed: dict[str, dict[str, Any]] = {}
         self.chat_requests: list[httpx.Request] = []
@@ -40,6 +42,8 @@ class FakeUpstream:
         self.jev_calls.append(body)
         if self.jev_fail:
             return httpx.Response(500, json={"error": "boom"})
+        if self.jev_raw is not None:
+            return self.jev_raw
         answers: dict[str, Any] = {}
         for name, q in body["questions"].items():
             if q["type"] == "choice":
@@ -68,7 +72,7 @@ class FakeUpstream:
         self.chat_calls.append(body)
         model = body["model"]
         if model in self.fail_models:
-            return httpx.Response(503, json={"error": {"message": f"{model} overloaded"}})
+            return httpx.Response(self.fail_status, json={"error": {"message": f"{model} overloaded"}})
         usage = {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30, "cost": 0.000004}
         if body.get("stream"):
             chunks = [
@@ -143,7 +147,7 @@ def provider_env(monkeypatch):
 def make_client(tmp_path, upstream, provider_env):
     clients: list[TestClient] = []
 
-    def factory(client_host: str = "testclient", **overrides: Any) -> TestClient:
+    def factory(client_host: str = "testclient", *, raise_server_exceptions: bool = True, **overrides: Any) -> TestClient:
         values: dict[str, Any] = {
             "jev_api_key": "test-jev",
             "jev_router_api_keys": "",
@@ -158,7 +162,8 @@ def make_client(tmp_path, upstream, provider_env):
         }
         values.update(overrides)
         client = TestClient(create_app(Settings(**values), transport=upstream.transport),
-                            base_url="http://localhost", client=(client_host, 50000))
+                            base_url="http://localhost", client=(client_host, 50000),
+                            raise_server_exceptions=raise_server_exceptions)
         client.__enter__()
         clients.append(client)
         return client

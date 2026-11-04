@@ -165,15 +165,23 @@ class DecisionEngine:
             questions[name] = q
 
         start = time.perf_counter()
+
+        def heuristic(error: str) -> Signals:
+            log.warning("Jev decision failed, using heuristic router: %s", error)
+            return dataclasses.replace(
+                fallback, source="heuristic_fallback", error=error,
+                latency_ms=round((time.perf_counter() - start) * 1000, 1),
+            )
+
         try:
             data = await self.jev.ask(build_state(features, eligible), questions)
         except JevError as e:
-            log.warning("Jev decision failed, using heuristic router: %s", e)
-            return dataclasses.replace(
-                fallback, source="heuristic_fallback", error=str(e),
-                latency_ms=round((time.perf_counter() - start) * 1000, 1),
-            )
-        signals = parse_answers(data, eligible, fallback)
+            return heuristic(str(e))
+        try:
+            signals = parse_answers(data, eligible, fallback)
+        except (TypeError, ValueError, KeyError, AttributeError) as e:
+            # Jev answered, but with values we cannot use (null confidence, non-numeric labels, ...).
+            return heuristic(f"Jev returned malformed answers: {e.__class__.__name__}")
         signals.latency_ms = round((time.perf_counter() - start) * 1000, 1)
         self.cache.set(key, signals)
         return signals

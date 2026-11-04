@@ -36,7 +36,8 @@ class OpenAICompatProvider(Provider):
     ) -> AsyncIterator[dict[str, Any]]:
         url, headers, body = self._request(spec, model, payload)
         body["stream"] = True
-        body["stream_options"] = {**(body.get("stream_options") or {}), "include_usage": True}
+        options = body.get("stream_options")
+        body["stream_options"] = {**(options if isinstance(options, dict) else {}), "include_usage": True}
         try:
             async with self.client.stream("POST", url, headers=headers, json=body) as resp:
                 await raise_for_status(resp)
