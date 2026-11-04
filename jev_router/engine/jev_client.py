@@ -52,8 +52,11 @@ class JevClient:
                 last_error = JevError(f"Jev request failed: {e.__class__.__name__}")
             else:
                 if resp.status_code == 200:
-                    data = resp.json()
-                    if not isinstance(data.get("answers"), dict):
+                    try:
+                        data = resp.json()
+                    except ValueError:
+                        raise JevError("Jev returned invalid JSON") from None
+                    if not isinstance(data, dict) or not isinstance(data.get("answers"), dict):
                         raise JevError("Jev response has no answers")
                     return data
                 last_error = JevError(f"Jev returned {resp.status_code}: {resp.text[:300]}", resp.status_code)

@@ -119,6 +119,11 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
     async def _http_error(_: Request, e: StarletteHTTPException):
         return error_response(e.status_code, str(e.detail), "http_error")
 
+    @app.exception_handler(Exception)
+    async def _unhandled_error(_: Request, e: Exception):
+        # Starlette still re-raises after this, so the traceback reaches the server log.
+        return error_response(500, "Internal error in Jev Router.", "internal_error", "server_error")
+
     app.include_router(chat.router)
     app.include_router(routing.router)
     app.include_router(observability.router)

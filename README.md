@@ -381,7 +381,7 @@ Set `TOGETHER_API_KEY` and restart. The model is now part of routing. [Settings]
 ## Development
 
 ```bash
-pytest                                  # 133 tests, no network needed (Jev and providers are mocked)
+pytest                                  # 159 tests, no network needed (Jev and providers are mocked)
 jev-router serve --reload --port 8000
 jev-router eval --jev-only
 ```

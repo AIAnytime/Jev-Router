@@ -16,7 +16,7 @@ from ..providers import ProviderError
 from ..registry import ModelSpec, ProviderSpec, Registry
 from ..schemas import ChatCompletionRequest, RouterOptions
 from ..storage import TraceStore
-from .executor import AllProvidersFailed, Attempt, Executor, attempts_dict
+from .executor import AllProvidersFailed, Attempt, Executor, attempts_dict, client_status
 from .guardrails import Guardrails, GuardResult
 
 log = logging.getLogger("jev_router")
@@ -172,7 +172,7 @@ class ModelRouter:
         )
         if guard and self.guardrails.blocks(guard):
             trace = self.build_trace(routed, status="blocked", error="blocked by guardrails")
-            await self.store.record(trace)
+            await self.record(trace)
             raise RoutingError(
                 403, "Request blocked by Jev Router guardrails.", "policy_violation", {"guardrails": guard.as_dict()}, trace_id
             )
@@ -271,8 +271,15 @@ class ModelRouter:
             "X-Jev-Router-Confidence": f"{trace['confidence']:.3f}",
         }
 
+    async def record(self, trace: dict[str, Any]) -> None:
+        """Store a trace without letting a storage failure replace the response the client is owed."""
+        try:
+            await self.store.record(trace)
+        except Exception:
+            log.exception("failed to record trace %s", trace.get("id"))
+
     def _record_later(self, trace: dict[str, Any]) -> None:
-        task = asyncio.get_running_loop().create_task(self.store.record(trace))
+        task = asyncio.get_running_loop().create_task(self.record(trace))
         self._background.add(task)
         task.add_done_callback(self._background.discard)
 
@@ -298,11 +305,11 @@ class ModelRouter:
             model, result, attempts = await self.executor.complete(routed.chain, routed.payload, routed.providers)
         except AllProvidersFailed as e:
             trace = self.build_trace(routed, "error", attempts=e.attempts, error=str(e))
-            await self.store.record(trace)
-            raise RoutingError(e.status if e.status >= 400 else 502, str(e), "upstream_error", {"attempts": attempts_dict(e.attempts)}, routed.trace_id)
+            await self.record(trace)
+            raise RoutingError(client_status(e.status), str(e), "upstream_error", {"attempts": attempts_dict(e.attempts)}, routed.trace_id)
         upstream_ms = round((time.perf_counter() - t0) * 1000, 1)
         trace = self.build_trace(routed, "success", model, attempts, result.get("usage") or {}, upstream_ms)
-        await self.store.record(trace)
+        await self.record(trace)
         result["model"] = model.id
         result["jev_router"] = self.public_trace(trace)
         return result, self.headers(trace)
@@ -312,14 +319,15 @@ class ModelRouter:
     ) -> tuple[AsyncIterator[str], dict[str, str]]:
         opts = body.jev_router or RouterOptions()
         routed = await self.plan(body.messages, self.upstream_payload(body), opts, body.model, header_strategy)
-        want_usage = bool((body.model_extra or {}).get("stream_options", {}).get("include_usage"))
+        stream_options = (body.model_extra or {}).get("stream_options")
+        want_usage = isinstance(stream_options, dict) and bool(stream_options.get("include_usage"))
         t0 = time.perf_counter()
         try:
             model, first, stream, attempts = await self.executor.open_stream(routed.chain, routed.payload, routed.providers)
         except AllProvidersFailed as e:
             trace = self.build_trace(routed, "error", attempts=e.attempts, stream=True, error=str(e))
-            await self.store.record(trace)
-            raise RoutingError(e.status if e.status >= 400 else 502, str(e), "upstream_error", {"attempts": attempts_dict(e.attempts)}, routed.trace_id)
+            await self.record(trace)
+            raise RoutingError(client_status(e.status), str(e), "upstream_error", {"attempts": attempts_dict(e.attempts)}, routed.trace_id)
 
         preview = self.build_trace(routed, "streaming", model, attempts, None, None, stream=True)
 
@@ -351,6 +359,10 @@ class ModelRouter:
                 status, error = "cancelled", "client disconnected"
                 raise
             finally:
+                try:
+                    await stream.aclose()  # release the upstream connection now, not at garbage collection
+                except Exception:
+                    log.debug("closing upstream stream failed", exc_info=True)
                 final_usage = usage or {"prompt_tokens": routed.features.input_tokens, "completion_tokens": out_chars // 4, "estimated": True}
                 upstream_ms = round((time.perf_counter() - t0) * 1000, 1)
                 self._record_later(self.build_trace(routed, status, model, attempts, final_usage, upstream_ms, True, error))

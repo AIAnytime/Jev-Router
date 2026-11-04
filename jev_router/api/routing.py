@@ -15,7 +15,7 @@ router = APIRouter(prefix="/v1/route", tags=["routing"])
 async def _record(request: Request, endpoint: str, result: dict[str, Any], selected: str | None, preview: str) -> str:
     trace_id = f"jr-{uuid.uuid4().hex[:20]}"
     settings = request.app.state.settings
-    await request.app.state.store.record({
+    await request.app.state.model_router.record({
         "id": trace_id,
         "created_at": time.time(),
         "endpoint": endpoint,
@@ -46,7 +46,7 @@ async def route_model(body: RouteModelRequest, request: Request, _: str = Depend
     routed = await svc.plan(messages, payload, body.jev_router, body.model, request.headers.get("x-jev-strategy"))
     trace = svc.build_trace(routed, "planned")
     trace["endpoint"] = "route_model"
-    await request.app.state.store.record(trace)
+    await svc.record(trace)
     return svc.public_trace(trace)
 
 
