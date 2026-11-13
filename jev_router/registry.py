@@ -23,6 +23,8 @@ class ProviderSpec(BaseModel):
     stored_key: str | None = Field(None, repr=False, exclude=True)
     stored_key_unreadable: bool = False
     enabled_override: bool | None = None
+    # Strict OpenAI-compatible servers can disable synthesized cache identity.
+    supports_prompt_cache_key: bool = True
 
     @property
     def env_key(self) -> str | None:

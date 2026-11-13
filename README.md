@@ -376,6 +376,13 @@ models:
     supports_tools: true
 ```
 
+For OpenAI-compatible providers, Jev Router adds a stable `prompt_cache_key`
+when the caller supplies neither `prompt_cache_key` nor `session_id`. The key
+uses the provider, upstream model, initial system/developer context and first
+user message, so appended turns retain the same cache namespace. Set
+`supports_prompt_cache_key: false` for a strict compatible server that rejects
+unknown request fields.
+
 Set `TOGETHER_API_KEY` and restart. The model is now part of routing. [Settings](#settings) does the same from the dashboard without a restart, and its Export card turns those changes into this format. Strategy weights, the capability floor and guardrail thresholds are in [config/router.yaml](config/router.yaml).
 
 ## Development
